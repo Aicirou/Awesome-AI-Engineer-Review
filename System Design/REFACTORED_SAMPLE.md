@@ -6780,3 +6780,442 @@ All 11 real-world system designs have been comprehensively refactored with:
 
 **Next**: Phase 5 (Final enhancements - Pattern Index, Decision Trees, Comparison Matrix)
 
+
+---
+
+# 📚 Phase 5 Enhancements: Pattern Index, Decision Trees & Comparison Matrix
+
+## 🎯 Pattern Index - Cross-Reference of Design Patterns
+
+### Architectural Patterns
+
+| Pattern | Systems Using It | Use Case | Implementation Details |
+|---------|------------------|----------|------------------------|
+| **Layered Architecture** | YouTube, Instagram, WhatsApp, Google Docs | Separation of concerns | Presentation → Business Logic → Data Access → Database |
+| **Microservices** | Uber, Twitter, Quora | Independent scaling, deployment | Service mesh, API gateway, service discovery (Consul/Eureka) |
+| **Event-Driven** | Instagram (Stories), Twitter (Timeline), Newsfeed | Asynchronous processing | Kafka, RabbitMQ, AWS SNS/SQS |
+| **CQRS (Command Query Responsibility Segregation)** | Twitter (read/write separation), Google Docs | Optimize read vs write paths | Separate models: write (Manhattan) vs read (Lucene/Memcached) |
+| **Saga Pattern** | Uber (payments), E-commerce | Distributed transactions | Choreography (events) or Orchestration (central coordinator) |
+| **Circuit Breaker** | All distributed systems | Fault tolerance | Hystrix, Resilience4j, implement timeouts + fallbacks |
+| **Bulkhead** | Rate Limiter, API Gateway | Resource isolation | Thread pools, connection pools per client tier |
+| **Strangler Fig** | Twitter (Manhattan replaced Cassandra) | Legacy system migration | Incrementally route traffic from old to new system |
+
+### Data Patterns
+
+| Pattern | Systems Using It | Use Case | Key Characteristics |
+|---------|------------------|----------|---------------------|
+| **Sharding** | YouTube, Twitter, Instagram, Uber | Horizontal database scaling | Partition by user_id, consistent hashing, range-based |
+| **Replication** | All systems | High availability, read scaling | Master-slave (async), master-master (sync), 3x typical |
+| **Caching (Multi-tier)** | YouTube (CDN/RAM/SSD), Instagram (L1/L2/L3) | Latency reduction | CDN (90% hit) → App cache (8%) → Database (2%) |
+| **Read-Through Cache** | Quora, Twitter | Simplify cache logic | Cache sits between app and database, auto-populates |
+| **Write-Through Cache** | Instagram (Stories), WhatsApp | Consistency | Write to cache and database synchronously |
+| **Write-Behind Cache** | Google Analytics, Logging | High write throughput | Buffer writes in cache, batch flush to database |
+| **Eventual Consistency** | Newsfeed, Instagram likes | Availability over consistency | Accept stale reads for 100-1000ms |
+| **Strong Consistency** | Google Docs (OT), Banking | Correctness critical | 2PC, Paxos, Raft consensus algorithms |
+| **Denormalization** | NoSQL (MongoDB, Cassandra) | Read performance | Embed related data in single document, accept duplication |
+| **Materialized Views** | Analytics dashboards, Leaderboards | Pre-computed aggregates | Redis sorted sets, pre-join tables |
+
+### Communication Patterns
+
+| Pattern | Systems Using It | Use Case | Protocols/Technologies |
+|---------|------------------|----------|------------------------|
+| **Request-Response (Synchronous)** | Most APIs | Simple queries | HTTP/REST, gRPC |
+| **Pub-Sub** | Twitter (notifications), Instagram (feed updates) | 1-to-many messaging | Redis Pub/Sub, Kafka topics, AWS SNS |
+| **Message Queue** | Uber (trip processing), YouTube (video encoding) | Async task processing | RabbitMQ, AWS SQS, Google Pub/Sub |
+| **Long Polling** | Quora (notifications), Facebook (older implementation) | Near real-time updates | HTTP keep-alive, 30-60s timeout |
+| **WebSockets** | WhatsApp, Google Docs, Typeahead | Bi-directional real-time | Persistent TCP connection, <50ms latency |
+| **Server-Sent Events (SSE)** | Stock tickers, Live sports scores | Server-to-client streaming | HTTP-based, uni-directional |
+| **gRPC Streaming** | YouTube (video upload), Google Maps (GPS tracking) | Efficient binary streaming | HTTP/2, Protobuf, bi-directional |
+
+### Scalability Patterns
+
+| Pattern | Systems Using It | Use Case | Scale Achieved |
+|---------|------------------|----------|----------------|
+| **Horizontal Scaling (Stateless Services)** | All systems | Add more servers | Linear scalability up to 1000s of nodes |
+| **Auto-Scaling** | Cloud systems (AWS ECS, K8s) | Dynamic capacity | Scale on CPU/memory/queue depth metrics |
+| **Database Federation** | Large enterprises | Partition by function | Users DB, Products DB, Orders DB separate |
+| **Read Replicas** | YouTube, Twitter | Read scaling | 10-100x read capacity vs single master |
+| **Load Balancing** | All systems | Traffic distribution | Layer 4 (TCP) + Layer 7 (HTTP), consistent hashing |
+| **CDN (Content Delivery Network)** | YouTube, Instagram | Global content distribution | 50-200 PoPs, 90%+ cache hit ratio |
+| **Geographically Distributed** | Google Maps, Uber | Low latency worldwide | Data centers in US-East, US-West, EU, Asia regions |
+| **Fan-Out on Write** | Twitter (celebrities <10K followers), Newsfeed | Pre-compute timelines | Write to N follower caches proactively |
+| **Fan-Out on Read** | Twitter (mega-influencers >1M followers) | Avoid write amplification | Compute timeline on-demand per read request |
+
+---
+
+## 🌳 Decision Trees for Technology Selection
+
+### 1. Database Selection Decision Tree
+
+```
+START: Choosing a Database
+│
+├─ Need ACID transactions + complex joins?
+│  ├─ YES → Need distributed + high availability?
+│  │        ├─ YES → **CockroachDB** / **YugabyteDB** / **Google Spanner**
+│  │        │         (Distributed SQL, strong consistency, 99.99% uptime)
+│  │        └─ NO → **PostgreSQL** / **MySQL**
+│  │                  (Traditional RDBMS, <100K QPS per node)
+│  │
+│  └─ NO → What's your primary access pattern?
+│           │
+│           ├─ Key-value lookups (user profiles, sessions)
+│           │  → **Redis** (in-memory, <1ms latency)
+│           │  → **DynamoDB** / **Cassandra** (persistent, 10ms P99)
+│           │
+│           ├─ Document storage (flexible schema, JSON)
+│           │  → **MongoDB** (rich queries, <10ms reads)
+│           │  → **Couchbase** (built-in cache, mobile sync)
+│           │
+│           ├─ Wide-column (time-series, analytics)
+│           │  → **Cassandra** (write-heavy, petabyte-scale)
+│           │  → **HBase** / **BigTable** (strong consistency)
+│           │
+│           ├─ Graph relationships (social, recommendations)
+│           │  → **Neo4j** (ACID, Cypher query language)
+│           │  → **DGraph** (GraphQL-native, distributed)
+│           │
+│           └─ Full-text search
+│              → **Elasticsearch** / **OpenSearch** (inverted index, faceted search)
+│              → **Algolia** (managed, typo-tolerance, <10ms)
+```
+
+### 2. Cache Strategy Selection
+
+```
+START: Choosing a Caching Strategy
+│
+├─ Cache location?
+│  ├─ Client-side (browser, mobile app)
+│  │  → **Local Storage** / **IndexedDB** / **SQLite**
+│  │     Use: Static assets, user preferences
+│  │     TTL: Hours to days
+│  │
+│  ├─ CDN (edge, global)
+│  │  → **Cloudflare** / **Fastly** / **Akamai**
+│  │     Use: Images, videos, static HTML/CSS/JS
+│  │     TTL: 1-30 days, manual purge on updates
+│  │
+│  ├─ Application-level (in-process)
+│  │  → **Caffeine** (Java) / **GoCache** (Go) / **LRU Cache** (Python)
+│  │     Use: Hot data, <1MB, single-server
+│  │     TTL: Seconds to minutes
+│  │
+│  └─ Distributed (shared across servers)
+│     ├─ Need persistence + advanced data structures?
+│     │  ├─ YES → **Redis** (sorted sets, pub/sub, Lua scripts)
+│     │  └─ NO → **Memcached** (pure cache, 1M+ ops/sec)
+│     │
+│     └─ Need multi-region replication?
+│        ├─ YES → **Redis Enterprise** / **Amazon ElastiCache Global Datastore**
+│        └─ NO → **Redis** / **Memcached** (single region)
+│
+├─ Cache population strategy?
+│  ├─ **Cache-Aside** (Lazy Loading)
+│  │  → App checks cache first, fetches from DB on miss, then stores in cache
+│  │  → Use: Read-heavy, tolerate stale data (e.g., user profiles, product catalogs)
+│  │  → **Example**: Twitter user profile lookup
+│  │
+│  ├─ **Read-Through**
+│  │  → Cache automatically loads from DB on miss (cache library handles it)
+│  │  → Use: Simplify code, consistent pattern
+│  │  → **Example**: Hibernate second-level cache
+│  │
+│  ├─ **Write-Through**
+│  │  → Write to cache and DB synchronously
+│  │  → Use: Strong consistency needed (e.g., inventory, financial balances)
+│  │  → **Trade-off**: Higher write latency (+5-10ms)
+│  │
+│  ├─ **Write-Behind** (Write-Back)
+│  │  → Write to cache immediately, async flush to DB
+│  │  → Use: High write throughput (e.g., analytics, click tracking)
+│  │  → **Risk**: Data loss if cache crashes before flush
+│  │
+│  └─ **Refresh-Ahead**
+│     → Proactively refresh cache before expiry
+│     → Use: Predictable access patterns (e.g., homepage data, trending topics)
+│     → **Example**: Pre-warm cache during off-peak hours
+│
+└─ Eviction policy?
+   ├─ **LRU** (Least Recently Used) → Default, works for 80% of cases
+   ├─ **LFU** (Least Frequently Used) → Long-term popularity (e.g., Wikipedia articles)
+   ├─ **FIFO** → Simple, predictable, good for queues
+   └─ **TTL-based** → Time-sensitive data (e.g., JWT tokens, OTP codes)
+```
+
+### 3. Rate Limiting Algorithm Selection
+
+```
+START: Choosing a Rate Limiting Algorithm
+│
+├─ Burst tolerance required?
+│  │
+│  ├─ YES (allow temporary spikes)
+│  │  ├─ Need precise rate control over time?
+│  │  │  ├─ YES → **Token Bucket** ⭐ [RECOMMENDED]
+│  │  │  │        • Capacity: Max burst size
+│  │  │  │        • Refill rate: Sustained rate
+│  │  │  │        • **Use**: AWS API Gateway, Stripe, most APIs
+│  │  │  │        • **Example**: 100 req/sec sustained, burst up to 1000
+│  │  │  │
+│  │  │  └─ NO (approximate okay) → **Fixed Window Counter**
+│  │  │           • Simple: Count requests per time window (e.g., per minute)
+│  │  │           • **Trade-off**: Boundary burst (200 req at 12:00:59 + 200 at 12:01:00 = 400 in 2 sec)
+│  │  │           • **Use**: Simple cases, low traffic
+│  │  │
+│  └─ NO (strict rate enforcement)
+│     → **Leaky Bucket**
+│        • Processes requests at fixed rate, queues excess
+│        • **Use**: Message brokers, batch processing (Kafka, RabbitMQ)
+│        • **Trade-off**: Higher memory (O(N) queue), added latency
+│
+├─ Need accuracy + memory efficiency?
+│  └─ YES → **Sliding Window Counter** (Hybrid) ⭐ [RECOMMENDED]
+│            • Combines fixed window (memory O(1)) + sliding accuracy (99%)
+│            • **Use**: High-traffic APIs, distributed systems
+│            • **Example**: Cloudflare, Kong API Gateway
+│
+├─ Need perfect accuracy?
+│  └─ YES → **Sliding Window Log**
+│            • Store timestamp of each request
+│            • **Trade-off**: High memory (O(N)), expensive (scan + delete old entries)
+│            • **Use**: Financial systems, compliance (audit trail)
+│
+└─ Distributed rate limiting (multiple servers)?
+   ├─ **Centralized Counter** (Redis)
+   │  • Single source of truth
+   │  • **Trade-off**: Redis is SPOF, network latency +1-5ms
+   │  • **Use**: Most production systems (Netflix, Twitter)
+   │
+   ├─ **Local + Sync** (Gossip Protocol)
+   │  • Each node tracks locally, periodically syncs
+   │  • **Trade-off**: Eventual consistency, may exceed limit temporarily
+   │  • **Use**: Relaxed requirements, very high throughput
+   │
+   └─ **Rate Limit Headers** (Response to client)
+      • X-RateLimit-Limit: 1000
+      • X-RateLimit-Remaining: 234
+      • X-RateLimit-Reset: 1699999999 (Unix timestamp)
+      • **Use**: All public APIs for client-side backoff
+```
+
+### 4. Fan-Out Strategy Selection (Social Networks)
+
+```
+START: Newsfeed Fan-Out Strategy
+│
+├─ User's follower count?
+│  │
+│  ├─ < 1,000 followers → **Fan-Out on Write (Push Model)** ⭐
+│  │  • Write post → Immediately insert into all followers' newsfeeds (cache/DB)
+│  │  • **Read time**: O(1) - just fetch pre-computed feed
+│  │  • **Write time**: O(N) where N = follower count
+│  │  • **Storage**: O(M × N) where M = posts, N = followers
+│  │  • **Example**: Regular Instagram user posts a photo
+│  │  • **Pros**: Instant feed updates, fast reads (<10ms)
+│  │  • **Cons**: Write amplification for popular users
+│  │
+│  ├─ 1,000 - 100,000 followers → **Hybrid Model** ⭐ [MOST COMMON]
+│  │  • **Push to active followers** (<10K active in last 30 days)
+│  │  • **Pull for inactive followers** (compute on-demand if they login)
+│  │  • **Example**: Medium-sized influencer (YouTuber with 50K subs)
+│  │  • **Optimization**: Pre-compute for VIP followers (verified, frequently engage)
+│  │  • **Trade-off**: Complexity in tracking active vs inactive
+│  │
+│  └─ > 100,000 followers (Celebrities, Mega-Influencers) → **Fan-Out on Read (Pull Model)**
+│     • Write post → Store once in user's timeline table
+│     • Read feed → Fetch posts from followees on-demand, merge, rank
+│     • **Read time**: O(K × log K) where K = followees count
+│     • **Write time**: O(1) - just insert one record
+│     • **Example**: Taylor Swift tweets → 100M followers, don't fan-out
+│     • **Pros**: No write amplification, O(1) storage
+│     • **Cons**: Slower reads (100-500ms), requires caching of celebrity posts
+│
+├─ Hybrid Implementation Details (Twitter's approach)
+│  │
+│  ├─ **In-Memory Fan-Out**
+│  │  • Push to Redis sorted sets (feed cache)
+│  │  • Key: user:{follower_id}:feed
+│  │  • Value: [{post_id, timestamp, score}] (sorted by time)
+│  │  • Limit: Keep last 800 posts per user (~1KB total)
+│  │
+│  ├─ **Pull from Celebrity Cache**
+│  │  • Celebrities' recent posts (last 24 hours) in dedicated Redis cache
+│  │  • Key: celeb_posts:global (sorted set)
+│  │  • All users fetch from this shared cache on read
+│  │  • **Hit ratio**: 95%+ (most users follow ≥1 celebrity)
+│  │
+│  └─ **Merge Algorithm (Feed Rendering)**
+│     1. Fetch pre-computed feed from Redis (pushed posts)
+│     2. Fetch celebrity posts from shared cache (pulled posts)
+│     3. Merge two lists by timestamp
+│     4. Apply ML ranking (engagement prediction, recency, relevance)
+│     5. Return top 20-50 posts
+│     6. **Total latency**: 50-150ms
+│
+└─ When to Recompute?
+   ├─ **Incremental Updates** → New post triggers small update
+   ├─ **Full Recomputation** → User follows/unfollows someone, refresh entire feed
+   ├─ **Scheduled Refresh** → Daily at 3 AM for inactive users (catch up on missed posts)
+   └─ **On-Demand** → User explicitly pulls to refresh (swipe down)
+```
+
+---
+
+## 📊 Technology Comparison Matrix
+
+### 1. Relational vs NoSQL Databases
+
+| Dimension | PostgreSQL | MySQL | CockroachDB | MongoDB | Cassandra | Redis |
+|-----------|------------|-------|-------------|---------|-----------|-------|
+| **Type** | RDBMS | RDBMS | Distributed SQL | Document | Wide-Column | Key-Value |
+| **ACID** | ✅ Full | ✅ Full | ✅ Full | ⚠️ Single-doc | ❌ Eventual | ⚠️ Single-key |
+| **Consistency** | Strong | Strong | Strong | Eventual | Tunable | Strong |
+| **Scalability** | Vertical | Vertical | Horizontal | Horizontal | Horizontal | Vertical |
+| **Max Throughput** | 50K QPS | 100K QPS | 50K QPS | 100K QPS | 1M writes/s | 1M ops/s |
+| **Latency (P99)** | 5-10ms | 5-10ms | 10-50ms | 5-10ms | 5-10ms | <1ms |
+| **Joins** | ✅ Excellent | ✅ Good | ✅ Excellent | ❌ Limited | ❌ No | ❌ No |
+| **Schema** | Fixed | Fixed | Fixed | Flexible | Flexible | Schema-less |
+| **Replication** | Async/Sync | Async/Sync | Multi-region | Replica sets | Multi-DC | Master-Replica |
+| **Best For** | Complex queries | Web apps | Global apps | Rapid dev | Time-series | Caching |
+| **Worst For** | High writes | Sharding | Low latency | Analytics | Joins | Large values |
+| **Cost** | Open-source | Open-source | $$$ (license) | Open-source | Open-source | Open-source |
+| **Max Data Size** | 32TB/table | 64TB/table | Petabytes | Petabytes | Exabytes | 512MB/key |
+| **Who Uses It** | Instagram, Uber | Facebook, Twitter | CockroachLabs | eBay, EA | Netflix, Apple | Twitter, GitHub |
+
+### 2. Caching Solutions Comparison
+
+| Feature | Memcached | Redis | Caffeine (Java) | Varnish | CDN (Cloudflare) |
+|---------|-----------|-------|-----------------|---------|------------------|
+| **Primary Use** | Distributed cache | Distributed cache + DB | In-process cache | HTTP cache | Global edge cache |
+| **Data Structures** | String only | String, List, Set, Sorted Set, Hash, HyperLogLog, Bitmap | ConcurrentHashMap | Objects | Static files |
+| **Persistence** | ❌ No | ✅ RDB + AOF | ❌ No | ✅ Disk | ✅ SSD |
+| **Replication** | ❌ No | ✅ Master-Replica | ❌ No | ✅ Clustered | ✅ Global PoPs |
+| **Max Throughput** | 1M+ ops/s | 500K ops/s | 10M+ ops/s | 50K req/s | 100M+ req/s |
+| **Latency** | <1ms | <1ms | <0.01ms | 1-5ms | 10-50ms |
+| **Memory Limit** | 64GB/node | 512GB/node | Heap size | Unlimited | Unlimited |
+| **Eviction** | LRU | LRU, LFU, TTL | LRU, TinyLFU | TTL | TTL |
+| **Clustering** | ❌ Client-side | ✅ Redis Cluster | ❌ No | ✅ Yes | ✅ Global |
+| **Pub/Sub** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Scripting** | ❌ No | ✅ Lua | ❌ No | ✅ VCL | ✅ Workers (JS) |
+| **Best For** | Simple KV, high throughput | Complex data, persistence | Local cache, low latency | HTTP proxy | Static assets, global |
+| **Cost** | Open-source | Open-source | Open-source | Open-source | $$$ (usage-based) |
+| **Who Uses It** | Facebook, Pinterest | Twitter, GitHub, StackOverflow | Google, LinkedIn | Vimeo, BBC | 20% of web |
+
+### 3. Message Queues & Streaming Platforms
+
+| Feature | RabbitMQ | Apache Kafka | AWS SQS | Redis Streams | Google Pub/Sub |
+|---------|----------|--------------|---------|---------------|----------------|
+| **Type** | Message Broker | Distributed Log | Queue Service | Stream | Managed Pub/Sub |
+| **Ordering** | ✅ Per queue | ✅ Per partition | ❌ Best-effort | ✅ Per stream | ⚠️ Per key |
+| **Throughput** | 50K msg/s | 1M+ msg/s | 300K msg/s | 100K msg/s | 100K msg/s |
+| **Latency** | 1-5ms | 5-10ms | 10-100ms | <1ms | 10-100ms |
+| **Retention** | Until consumed | Days to years | 14 days max | Limited by memory | 7 days default |
+| **Persistence** | ✅ Disk | ✅ Disk | ✅ S3 | ⚠️ Optional | ✅ Cloud Storage |
+| **Replayability** | ❌ No | ✅ Yes (offset) | ⚠️ Limited | ✅ Yes | ✅ Yes (snapshots) |
+| **Max Message Size** | 128MB | 1MB default | 256KB | 512MB | 10MB |
+| **Delivery Semantics** | At-least-once | Exactly-once | At-least-once | At-least-once | At-least-once |
+| **Ordering Guarantee** | FIFO queues | Per partition | FIFO queues only | Yes | With ordering key |
+| **Clustering** | ✅ Yes | ✅ Yes | ✅ Managed | ✅ Cluster mode | ✅ Managed |
+| **Protocol** | AMQP | Custom (binary) | HTTP/SQS API | RESP | HTTP/gRPC |
+| **Best For** | Task queues, RPC | Event sourcing, logs | Decoupling services | Real-time analytics | Serverless, multi-cloud |
+| **Cost** | Self-hosted | Self-hosted | $0.40/1M requests | Open-source | $0.60/1M messages |
+| **Who Uses It** | Robinhood, Reddit | Uber, Netflix, LinkedIn | Airbnb, Capital One | Twitter (internal) | Spotify, PayPal |
+
+### 4. API Protocols Comparison
+
+| Feature | REST (HTTP/JSON) | gRPC (HTTP/2/Protobuf) | GraphQL | WebSocket | SOAP |
+|---------|------------------|------------------------|---------|-----------|------|
+| **Transport** | HTTP/1.1, HTTP/2 | HTTP/2 | HTTP | TCP | HTTP |
+| **Data Format** | JSON, XML | Protobuf (binary) | JSON | Binary/Text | XML |
+| **Latency** | 10-50ms | 1-5ms | 10-50ms | <10ms | 50-200ms |
+| **Throughput** | 10K req/s | 100K req/s | 10K req/s | 50K msg/s | 1K req/s |
+| **Type Safety** | ❌ No (runtime) | ✅ Yes (Protobuf schema) | ⚠️ Schema validation | ❌ No | ✅ WSDL |
+| **Browser Support** | ✅ Native | ❌ Requires proxy | ✅ Native | ✅ Native | ✅ With libraries |
+| **Streaming** | ❌ No (SSE possible) | ✅ Bi-directional | ⚠️ Subscriptions | ✅ Bi-directional | ❌ No |
+| **Caching** | ✅ HTTP caching | ❌ Limited | ⚠️ Complex | ❌ No | ⚠️ Limited |
+| **Code Generation** | ⚠️ Optional (OpenAPI) | ✅ Built-in | ✅ Built-in | ❌ Manual | ✅ From WSDL |
+| **Learning Curve** | Low | Medium | Medium | Low | High |
+| **Best For** | Public APIs, CRUD | Internal services, microservices | Flexible queries, mobile | Real-time, chat | Enterprise, legacy |
+| **Worst For** | High performance | Public-facing | Simple CRUD | HTTP compatibility | Modern web |
+| **Who Uses It** | Stripe, Twilio, most public APIs | Google, Netflix, Uber | GitHub, Shopify, Facebook | WhatsApp, Discord | Banks, SAP |
+
+### 5. Search & Analytics Engines
+
+| Feature | Elasticsearch | Apache Solr | Algolia | MeiliSearch | Typesense |
+|---------|---------------|-------------|---------|-------------|-----------|
+| **Based On** | Apache Lucene | Apache Lucene | Custom (C++) | Rust | C++ |
+| **Deployment** | Self-hosted | Self-hosted | Managed SaaS | Self-hosted | Self-hosted |
+| **Indexing Speed** | 10K docs/s | 10K docs/s | 100K docs/s | 50K docs/s | 50K docs/s |
+| **Query Latency** | 10-50ms | 10-50ms | <10ms | <10ms | <10ms |
+| **Typo Tolerance** | ⚠️ Fuzzy queries | ⚠️ Fuzzy queries | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+| **Faceted Search** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Vector Search** | ✅ Yes (HNSW) | ⚠️ Plugin | ❌ No | ✅ Yes | ✅ Yes |
+| **Real-time** | ✅ 1s refresh | ✅ 1s refresh | ✅ Instant | ✅ Instant | ✅ Instant |
+| **Scalability** | Petabytes | Petabytes | Managed | 10s of GB | 100s of GB |
+| **Language Support** | 30+ | 30+ | 40+ | 20+ | 20+ |
+| **Best For** | Logs, analytics | Enterprise search | E-commerce, apps | Small-medium datasets | Fast autocomplete |
+| **Cost** | Open-source | Open-source | $$$ (query-based) | Open-source | Open-source |
+| **Who Uses It** | Uber, LinkedIn, Netflix | Apple, Netflix, Instagram | Stripe, Twitch, Lacoste | Internal tools | Airbnb, Wikipedia |
+
+---
+
+## 📝 Quick Decision Framework Cheatsheet
+
+### When to Use Which Database?
+
+1. **Need complex joins + transactions** → PostgreSQL / MySQL
+2. **High write throughput (logs, events)** → Cassandra / ClickHouse
+3. **Fast key-value lookups** → Redis / DynamoDB
+4. **Flexible schema (rapid iteration)** → MongoDB / Firestore
+5. **Global distribution + strong consistency** → CockroachDB / Spanner
+6. **Full-text search** → Elasticsearch / MeiliSearch
+7. **Graph relationships** → Neo4j / ArangoDB
+8. **Time-series data** → InfluxDB / TimescaleDB
+
+### When to Use Which Cache?
+
+1. **Simple string caching, highest throughput** → Memcached
+2. **Complex data structures, persistence** → Redis
+3. **In-process, lowest latency** → Caffeine / Local cache
+4. **HTTP responses, reverse proxy** → Varnish / NGINX
+5. **Global static assets** → CDN (Cloudflare / Fastly)
+6. **Database query cache** → Redis / Memcached
+7. **Session storage** → Redis (persistence + expiry)
+
+### When to Use Which Message Queue?
+
+1. **Event sourcing, replay, high throughput** → Kafka
+2. **Task queue, RPC, dead-letter queues** → RabbitMQ
+3. **Serverless, AWS-native** → SQS + SNS
+4. **Real-time analytics** → Redis Streams / Pulsar
+5. **Simple pub-sub** → Redis Pub/Sub / Google Pub/Sub
+6. **Guaranteed ordering** → Kafka (per partition) / SQS FIFO
+
+### When to Use Which API Protocol?
+
+1. **Public-facing REST API** → REST (JSON)
+2. **Internal microservices** → gRPC (Protobuf)
+3. **Mobile apps (minimize bandwidth)** → GraphQL
+4. **Real-time bidirectional** → WebSocket
+5. **Enterprise integration** → SOAP (legacy) / REST (modern)
+
+---
+
+## 🎓 Common Anti-Patterns to Avoid
+
+1. **Database as Message Queue** → Use actual message queue (Kafka, RabbitMQ)
+2. **SELECT * in loops** (N+1 query problem) → Use joins or batch queries
+3. **Not using connection pooling** → Causes connection exhaustion
+4. **Caching without TTL** → Memory leaks, stale data
+5. **Ignoring database indexes** → Slow queries (seconds vs milliseconds)
+6. **Synchronous processing of async tasks** → Use message queues
+7. **Single point of failure** → Replicate critical components
+8. **No monitoring/alerting** → Blind to production issues
+9. **Premature optimization** → "Make it work, make it right, make it fast"
+10. **Not considering consistency model** → Leads to data corruption bugs
+
+---
+
+**End of Phase 5 Enhancements** 🎉
+
