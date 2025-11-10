@@ -1,19 +1,107 @@
-# Modern System Design - Refactored Sample
+# 🎯 Modern System Design - Interview Prep Guide
 
-This file demonstrates the improved structure and note-taking style for system design documentation.
+> **Complete reference for system design interviews** - Covering distributed systems concepts, architectural patterns, real-world implementations, and decision frameworks.
 
-## Key Improvements Applied
+---
 
-1. **📌 Quick Summary blocks** at the top of each section
-2. **🎯 Key Concepts** sections with highlighted terms
-3. **Comparison tables** for decision-making
-4. **💡 When to Use** sections with clear guidance
-5. **⚖️ Trade-offs** explicitly called out with pros/cons
-6. **⚠️ Common Pitfalls** with solutions
-7. **Real-world examples** with company names and scale
-8. **📝 Quick Reference** for scannable takeaways
-9. **Emojis** for visual hierarchy and scannability
-10. **Structured formatting** with consistent heading levels
+## 📚 Table of Contents
+
+### Part I: Core Concepts (1-6)
+- **[1. Concepts](#1-concepts)**
+  - [1.1 RPC (Remote Procedure Call)](#11-rpc-remote-procedure-call)
+  - [1.2 Fault Tolerance](#12-fault-tolerance)
+  - [1.3 Load Balancer](#13-load-balancer)
+  - [1.4 Databases](#14-databases)
+    - [1.4.1 SQL vs NoSQL](#141-sql-vs-nosql)
+    - [1.4.2 Data Replication & Consistency](#142-data-replication--consistency)
+    - [1.4.3 Sharding](#143-sharding)
+    - [1.4.4 Database Optimization](#144-database-optimization)
+  - [1.5 Storage](#15-storage)
+    - [1.5.1 Object Storage](#151-object-storage)
+    - [1.5.2 Merkle Tree](#152-merkle-tree)
+- **[2. Content Delivery Network (CDN)](#2-content-delivery-network-cdn)**
+- **[3. Cache](#3-cache)**
+  - [3.1 Cache Strategies](#31-cache-strategies)
+  - [3.2 Memcached vs Redis](#32-memcached-vs-redis)
+- **[4. Rate Limiter](#4-rate-limiter)**
+- **[5. Distributed Search](#5-distributed-search)**
+  - [5.1 Inverted Index](#51-inverted-index)
+  - [5.2 MapReduce](#52-mapreduce)
+- **[6. Distributed Task Scheduler](#6-distributed-task-scheduler)**
+
+### Part II: Real-World Systems (7-17)
+- **[7. YouTube](#7-youtube)**
+- **[8. Quora](#8-quora)**
+- **[9. Google Maps](#9-google-maps)**
+- **[10. Yelp](#10-yelp)**
+- **[11. Uber](#11-uber)**
+- **[12. Twitter](#12-twitter)**
+- **[13. Newsfeed System](#13-newsfeed-system)**
+- **[14. Instagram](#14-instagram)**
+- **[15. WhatsApp](#15-whatsapp)**
+- **[16. Typeahead Suggestion System](#16-typeahead-suggestion-system)**
+- **[17. Google Docs](#17-google-docs)**
+
+### Part III: Advanced Design Tools
+- **[Pattern Index](#-comprehensive-pattern-index)** - 40+ design patterns with decision frameworks
+- **[Decision Trees](#-decision-trees-for-system-design)** - Database, Cache, Rate Limiter, Fan-Out strategies
+- **[Technology Comparison Matrix](#-technology-comparison-matrix)** - 25+ systems compared across 8 dimensions
+
+---
+
+## 🎓 How to Use This Guide
+
+### For Interview Preparation
+1. **Quick Review**: Start with 📌 Quick Summary blocks in each section
+2. **Deep Dive**: Read full sections with real-world examples
+3. **Decision Making**: Use comparison tables and trade-off sections
+4. **Pattern Recognition**: Reference Pattern Index for common solutions
+5. **Practice**: Use Decision Trees to simulate interview scenarios
+
+### Key Features
+- ✅ **Complete Coverage**: All major system design topics
+- ✅ **Real-World Examples**: Companies and scale metrics
+- ✅ **Visual Aids**: 33 architectural diagrams with detailed descriptions
+- ✅ **Decision Frameworks**: When to use each technology
+- ✅ **Trade-off Analysis**: Pros/cons for every approach
+- ✅ **Interview-Optimized**: Structured for quick reference and recall
+
+---
+
+# 1. Concepts
+
+> **📌 Section Overview**: Fundamental building blocks of modern distributed systems - from communication protocols to data storage and fault tolerance.
+
+### 📊 Distributed Systems Concepts Overview
+
+![Modern System Design Concepts Overview](https://github.com/user-attachments/assets/2295663b-18fb-4a79-9258-b31b9e0d3638)
+
+**🖼️ Diagram Description:**
+This comprehensive architecture diagram illustrates the fundamental concepts that form the backbone of modern distributed systems:
+
+**Core Components:**
+- **Communication Layer**: RPC (Remote Procedure Call) protocols enabling inter-service communication
+- **Resilience Layer**: Fault tolerance mechanisms including circuit breakers, retries, and failover strategies
+- **Distribution Layer**: Load balancers distributing traffic across multiple servers
+- **Data Layer**: Database systems (SQL/NoSQL) with replication and sharding strategies
+- **Storage Layer**: Object storage systems and Merkle trees for data integrity
+- **Delivery Layer**: CDN infrastructure for global content distribution
+- **Performance Layer**: Caching strategies (Redis, Memcached) for low-latency access
+- **Protection Layer**: Rate limiters preventing system overload
+- **Search Layer**: Distributed search with inverted indexes and MapReduce
+- **Orchestration Layer**: Task schedulers coordinating distributed workloads
+
+**Key Relationships:**
+- All components interconnect through load balancers ensuring high availability
+- Data flows from storage → cache → CDN for optimized delivery
+- Fault tolerance mechanisms protect every layer
+- Scaling happens horizontally across all tiers
+
+**Interview Relevance:**
+- Shows how concepts layer together in production systems
+- Demonstrates separation of concerns (SoC) principle
+- Illustrates CAP theorem trade-offs across different layers
+- Highlights where bottlenecks typically occur (database, cache, network)
 
 ---
 
@@ -287,7 +375,7 @@ A **load balancer** acts as a traffic cop, distributing client requests across m
 **Monitoring**: Track requests/sec, error rate, response time per server
 
 ---
-<!-- TOC --><a name="14-database"></a>
+
 ## 1.4 Database Selection
 
 > **📌 Quick Summary**: Choosing between SQL and NoSQL databases based on consistency, scalability, and data structure requirements  
@@ -426,7 +514,7 @@ The database selection is one of the most critical architectural decisions. The 
 
 ---
 
-<!-- TOC --><a name="15-key-value-store"></a>
+
 ## 1.5 Key-Value Store
 
 > **📌 Quick Summary**: Distributed hash table for storing key-value pairs with consistent hashing and Merkle trees for synchronization  
@@ -445,7 +533,7 @@ Key-value stores are fundamental building blocks of distributed systems, providi
 
 ---
 
-<!-- TOC --><a name="151consistent-hashing"></a>
+
 ### 1.5.1 Consistent Hashing
 
 > **📌 Quick Summary**: Hash function that minimizes key remapping when nodes join/leave the cluster
@@ -533,7 +621,7 @@ Request for key "user:1234" → hash = 67 → lands between C1 and A2 → handle
 
 ---
 
-<!-- TOC --><a name="152-merkle-tree"></a>
+
 ### 1.5.2 Merkle Tree
 
 > **📌 Quick Summary**: Hash tree enabling efficient detection and repair of replica inconsistencies
@@ -663,7 +751,7 @@ Cassandra uses Merkle trees for **nodetool repair**:
 
 ---
 
-<!-- TOC --><a name="14-database"></a>
+
 ## 1.4 Database Selection
 
 > **📌 Quick Summary**: Choosing between SQL and NoSQL databases based on consistency, scalability, and data structure requirements  
@@ -802,7 +890,7 @@ The database selection is one of the most critical architectural decisions. The 
 
 ---
 
-<!-- TOC --><a name="15-key-value-store"></a>
+
 ## 1.5 Key-Value Store
 
 > **📌 Quick Summary**: Distributed hash table for storing key-value pairs with consistent hashing and Merkle trees for synchronization  
@@ -821,7 +909,7 @@ Key-value stores are fundamental building blocks of distributed systems, providi
 
 ---
 
-<!-- TOC --><a name="151consistent-hashing"></a>
+
 ### 1.5.1 Consistent Hashing
 
 > **📌 Quick Summary**: Hash function that minimizes key remapping when nodes join/leave the cluster
@@ -909,7 +997,7 @@ Request for key "user:1234" → hash = 67 → lands between C1 and A2 → handle
 
 ---
 
-<!-- TOC --><a name="152-merkle-tree"></a>
+
 ### 1.5.2 Merkle Tree
 
 > **�� Quick Summary**: Hash tree enabling efficient detection and repair of replica inconsistencies
@@ -1027,7 +1115,7 @@ Cassandra uses Merkle trees for **nodetool repair**:
 
 ---
 
-<!-- TOC --><a name="2-content-delivery-network-cdn"></a>
+
 # 2. Content Delivery Network (CDN)
 
 > **📌 Quick Summary**: Globally distributed network of proxy servers that cache and deliver content closer to end users  
@@ -1156,7 +1244,7 @@ End users accessing content through various devices: browsers, smartphones, smar
 
 ---
 
-<!-- TOC --><a name="21-multi-tier-cdn-architecture"></a>
+
 ## 2.1 Multi-tier CDN Architecture
 
 > **📌 Quick Summary**: Hierarchical tree structure for efficient content distribution from origin to edge servers
@@ -1211,7 +1299,7 @@ Distributing content from origin to **thousands of edge servers simultaneously**
 
 ---
 
-<!-- TOC --><a name="22-dns-redirection"></a>
+
 ## 2.2 DNS Redirection
 
 > **📌 Quick Summary**: Two-step process to route clients to optimal edge server using DNS
@@ -1266,7 +1354,7 @@ Within selected facility, distribute load across proxy servers
 
 ---
 
-<!-- TOC --><a name="24-distributed-cache"></a>
+
 ## 2.4 Distributed Cache
 
 > **📌 Quick Summary**: Horizontally scaled caching system to handle massive data volumes with low latency  
@@ -1295,7 +1383,7 @@ Within selected facility, distribute load across proxy servers
 
 ---
 
-<!-- TOC --><a name="241-internals-of-cache-server"></a>
+
 ### 2.4.1 Internals of Cache Server
 
 > **📌 Quick Summary**: Three core mechanisms for efficient caching: hash map, doubly linked list, eviction policy
@@ -1364,7 +1452,7 @@ HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
 
 ---
 
-<!-- TOC --><a name="242-high-performance"></a>
+
 ### 2.4.2 High Performance Characteristics
 
 > **�� Quick Summary**: Multiple optimizations combine for sub-millisecond cache performance
@@ -1412,7 +1500,7 @@ HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
 
 ---
 
-<!-- TOC --><a name="243-memcached-vs-redis-feature-comparison"></a>
+
 ### 2.4.3 Memcached vs. Redis: Feature Comparison
 
 > **📌 Quick Summary**: Two popular distributed cache solutions with different trade-offs
@@ -1483,7 +1571,7 @@ HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
 
 ---
 
-<!-- TOC --><a name="3-rate-limiter"></a>
+
 # 3. Rate Limiter
 
 > **📌 Quick Summary**: Controls request rate to prevent system overload and abuse  
@@ -1677,7 +1765,55 @@ Request at 01:30 (50% into current window):
 | **Sliding Log** | Excellent | O(N) | ✅ Yes | High | Billing, strict enforcement |
 | **Sliding Counter** | Very Good | O(1) | ✅ Yes | Medium | **Recommended for most cases** |
 
-![image](https://github.com/user-attachments/assets/be78a775-8195-4dfb-8802-3c194be21692)
+![Rate Limiter Algorithm Comparison](https://github.com/user-attachments/assets/be78a775-8195-4dfb-8802-3c194be21692)
+
+**🖼️ Rate Limiter Algorithms - Visual Comparison:**
+
+This diagram illustrates the four main rate limiting algorithms with their operational mechanics:
+
+**1. Token Bucket Algorithm** (Top Left):
+- **Mechanism**: Bucket fills with tokens at fixed rate; requests consume tokens
+- **Visualization**: Tokens flow in continuously (5 tokens/sec), requests drain bucket
+- **Burst Handling**: Allows bursts up to bucket capacity (10 tokens max)
+- **Use Case**: API gateways needing flexible burst tolerance (AWS API Gateway, Kong)
+- **Pros**: Smooth rate limiting, handles bursty traffic gracefully
+- **Cons**: Can deplete bucket during sustained high traffic
+
+**2. Leaky Bucket Algorithm** (Top Right):
+- **Mechanism**: Requests queue in bucket, processed at fixed rate (FIFO)
+- **Visualization**: Requests enter bucket, leak out at constant rate
+- **Burst Handling**: Queues excess requests, rejects when bucket full
+- **Use Case**: Traffic shaping, network packet scheduling (Nginx rate limiting)
+- **Pros**: Smooths out traffic spikes, predictable output rate
+- **Cons**: Old requests processed first (may timeout), fixed processing rate
+
+**3. Fixed Window Counter** (Bottom Left):
+- **Mechanism**: Count requests in fixed time windows (e.g., per minute)
+- **Visualization**: Time divided into discrete windows, counter resets at boundaries
+- **Burst Handling**: Can allow 2x rate at window boundaries (edge case)
+- **Use Case**: Simple implementations, quota systems (Twitter API: 15 requests/15min)
+- **Pros**: Memory efficient O(1), easy to implement
+- **Cons**: Traffic spike at window boundaries, uneven rate limiting
+
+**4. Sliding Window Log** (Bottom Right):
+- **Mechanism**: Track timestamp of each request, count in rolling time window
+- **Visualization**: Continuous sliding window maintaining request timestamps
+- **Burst Handling**: Most accurate, no boundary issues
+- **Use Case**: Strict rate enforcement, financial systems (Stripe: 100 req/sec)
+- **Pros**: Most accurate, no edge cases, fair distribution
+- **Cons**: Higher memory O(N), more complex implementation
+
+**Interview Decision Framework:**
+- **Bursty APIs**: Token Bucket (AWS, Google Cloud)
+- **Traffic Shaping**: Leaky Bucket (Nginx, HAProxy)
+- **Simple Quotas**: Fixed Window (Twitter, GitHub)
+- **Strict Billing**: Sliding Window Log (Stripe, payment processors)
+- **Balanced Choice**: Sliding Window Counter (combines accuracy + efficiency)
+
+**Real-World Hybrid Approaches:**
+- **Cloudflare**: Token Bucket (1st tier) + Sliding Window (2nd tier)
+- **Redis Rate Limiting**: Fixed Window (fast path) + Sliding Log (strict mode)
+- **Kong API Gateway**: Token Bucket with configurable refill strategies
 
 ---
 
@@ -1791,7 +1927,7 @@ Request at 01:30 (50% into current window):
 
 ---
 
-<!-- TOC --><a name="4-distributed-search"></a>
+
 # 4. Distributed Search
 
 > **📌 Quick Summary**: Horizontally scaled search system using inverted indexes and MapReduce  
@@ -1809,7 +1945,7 @@ Request at 01:30 (50% into current window):
 
 ---
 
-<!-- TOC --><a name="41-blob-store"></a>
+
 ## 4.1 Blob Store
 
 > **📌 Quick Summary**: Storage system for large binary objects (images, videos, files)
@@ -1846,7 +1982,7 @@ Request at 01:30 (50% into current window):
 
 ---
 
-<!-- TOC --><a name="42-index"></a>
+
 ## 4.2 Inverted Index
 
 > **📌 Quick Summary**: Core data structure enabling fast full-text search
@@ -2152,13 +2288,77 @@ Shard 3: Terms N-Z
 
 ---
 
-<!-- TOC --><a name="5-distributed-task-scheduler"></a>
+
 # 5. Distributed Task Scheduler
 
 > **📌 Quick Summary**: Reliable execution of periodic and delayed tasks across distributed systems  
 > **Use Cases**: Cron jobs, background processing, workflow orchestration | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/5de17b3e-0048-4481-8507-1391d2e2e749)
+![Distributed Task Scheduler Architecture](https://github.com/user-attachments/assets/5de17b3e-0048-4481-8507-1391d2e2e749)
+
+**🖼️ Distributed Task Scheduler - Complete Architecture:**
+
+This diagram illustrates a production-grade distributed task scheduling system with fault tolerance and scalability:
+
+**Core Components Flow:**
+
+1. **Task Submission Layer** (Left):
+   - **API Gateway**: Receives task creation requests from clients
+   - **Task Validator**: Checks task parameters, schedule format, priority
+   - **Task Store (Primary DB)**: Persists task definitions (PostgreSQL/MySQL with ACID guarantees)
+   
+2. **Coordination Layer** (Center):
+   - **ZooKeeper Cluster**: Distributed coordination and leader election
+     - Maintains worker registry (which workers are alive)
+     - Stores task assignments (which worker handles which task)
+     - Provides distributed locks for exclusive task execution
+   - **Leader Election**: Ensures single scheduler master at any time
+   
+3. **Scheduling Engine** (Center-Right):
+   - **Priority Queues**: Tasks organized by execution time (heap data structure)
+   - **Task Dispatcher**: Assigns tasks to available workers based on:
+     - Worker capacity (current load)
+     - Task affinity (pin tasks to specific workers)
+     - Geographic proximity (reduce network latency)
+   - **Delayed Queue**: Holds future tasks, promotes to ready queue when time arrives
+   
+4. **Execution Layer** (Right):
+   - **Worker Pool**: Multiple worker nodes executing tasks in parallel
+   - **Task Executor**: Runs actual task logic (sandboxed/containerized)
+   - **Health Monitor**: Heartbeats to ZooKeeper every 30s
+   - **Result Reporter**: Sends execution status back to coordinator
+   
+5. **Reliability Mechanisms**:
+   - **Watchdog Service**: Detects worker failures, reassigns orphaned tasks
+   - **Retry Handler**: Implements exponential backoff for failed tasks
+   - **Dead Letter Queue**: Stores tasks that failed after max retries
+   - **Audit Log**: Records all task state transitions for debugging
+
+**Data Flow (Task Lifecycle):**
+1. Client submits task → API Gateway validates → Store in DB
+2. Scheduler reads tasks → Checks execution time → Adds to priority queue
+3. Dispatcher assigns task → Worker receives via message queue
+4. Worker executes → Reports status → Updates task state
+5. On failure → Retry handler kicks in → Requeue or move to DLQ
+
+**Fault Tolerance Strategy:**
+- **Worker Failure**: ZooKeeper detects missing heartbeat → Watchdog reassigns task to healthy worker
+- **Scheduler Failure**: New leader elected via ZooKeeper → Reads task state from DB → Resumes scheduling
+- **Network Partition**: Tasks remain in persistent queue, retry after partition heals
+- **Database Failure**: Replicas provide read access, writes queued until primary recovers
+
+**Interview Key Points:**
+- **At-Least-Once Execution**: Task may run multiple times on failure (requires idempotency)
+- **Exactly-Once Semantics**: Use distributed transactions (2PC) or idempotency keys
+- **Scalability**: Add workers horizontally, partition task queue by hash(task_id)
+- **Real-World Systems**: Celery (Python), Sidekiq (Ruby), AWS Step Functions, Airflow
+
+**Scale Metrics:**
+- **Airflow (Uber)**: 500K+ tasks/day across 100+ workers
+- **Celery (Instagram)**: Millions of tasks/hour for async processing
+- **AWS Step Functions**: Handles billions of state transitions/month
+
+---
 
 ### Why Distributed Task Scheduler?
 
@@ -2378,13 +2578,111 @@ delay = base_delay * (2 ** attempt) + random(0, jitter)
 
 ---
 
-<!-- TOC --><a name="6-sharded-counters"></a>
+
 # 6. Sharded Counters
 
 > **📌 Quick Summary**: Distributed counter system to handle high-frequency increments  
 > **Use Cases**: View counts, likes, real-time analytics | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/0d3f9fff-271a-4693-a6d2-138add59b885)
+![Sharded Counters Architecture](https://github.com/user-attachments/assets/0d3f9fff-271a-4693-a6d2-138add59b885)
+
+**🖼️ Sharded Counters - High-Throughput Write Distribution:**
+
+This diagram demonstrates how sharded counters solve the hot key problem in high-traffic scenarios:
+
+**Problem Scenario (Top - Before Sharding):**
+- **Single Counter**: `video:abc123:views = 10,245,332`
+- **Write Bottleneck**: All increment operations hit one Redis key/database row
+- **Contention**: Lock conflicts when multiple servers increment simultaneously
+- **Performance Degradation**: 
+  - Without sharding: ~1,000 writes/sec (limited by single key locks)
+  - Network latency amplified: Every increment waits for previous to complete
+  - Database hot spot: CPU spikes on single partition
+
+**Solution Architecture (Bottom - With Sharding):**
+
+1. **Shard Distribution Strategy**:
+   - Counter split into N shards (typically 10-100 based on write volume)
+   - Each increment randomly selects a shard: `hash(request_id) % num_shards`
+   - Shards stored as separate keys: `video:abc123:views:shard_0`, `video:abc123:views:shard_1`, etc.
+
+2. **Write Flow** (Illustrated Left to Right):
+   ```
+   Client Request → Load Balancer → Application Server
+   → Shard Selector (hash function) → Redis/DB Shard
+   → Increment shard_X counter
+   ```
+
+3. **Read Aggregation Flow**:
+   ```
+   Read Request → Fetch all shards in parallel
+   → Sum(shard_0 + shard_1 + ... + shard_N)
+   → Cache aggregated result (1min TTL)
+   → Return total count
+   ```
+
+4. **Shard Management**:
+   - **Shard 0-9**: Each maintains independent counter
+   - **Write Distribution**: Random selection ensures even load (law of large numbers)
+   - **Read Optimization**: Aggregate values cached to avoid repeated summation
+   - **Consistency Model**: Eventually consistent (acceptable for view counts)
+
+**Performance Comparison:**
+
+| Metric | Single Counter | Sharded (10 shards) | Sharded (100 shards) |
+|--------|---------------|---------------------|---------------------|
+| Write Throughput | 1K writes/sec | 10K writes/sec | 100K writes/sec |
+| Write Latency | 50ms (p99) | 5ms (p99) | 1ms (p99) |
+| Read Latency | 1ms | 5ms (10 parallel reads) | 20ms (100 parallel reads) |
+| Contention | High | Low | Very Low |
+
+**Real-World Implementation:**
+
+**YouTube View Counter:**
+- 100 shards per video
+- Increments distributed across shards
+- Aggregated count computed every 5 minutes
+- Cached in CDN for 1 minute
+- Handles 40K+ view increments/sec for viral videos
+
+**Redis Implementation:**
+```python
+# Increment (Fast Write)
+shard_id = hash(video_id + timestamp) % NUM_SHARDS
+redis.incr(f"video:{video_id}:views:shard_{shard_id}")
+
+# Read (Parallel Aggregation)
+pipeline = redis.pipeline()
+for i in range(NUM_SHARDS):
+    pipeline.get(f"video:{video_id}:views:shard_{i}")
+counts = pipeline.execute()
+total_views = sum(int(c or 0) for c in counts)
+```
+
+**Trade-Offs:**
+- ✅ **Pros**: 
+  - Linear scalability of writes (add more shards)
+  - Reduced lock contention and hot key issues
+  - Simple implementation (just modulo hashing)
+  
+- ❌ **Cons**:
+  - Reads more expensive (must aggregate N shards)
+  - Eventually consistent (brief delay in total count)
+  - Over-sharding increases read latency (find balance)
+
+**Interview Decision Points:**
+- **How many shards?** Start with 10, increase based on write load (monitor p99 latency)
+- **When to aggregate?** Cache aggregated value, refresh periodically (trade freshness for performance)
+- **Consistency requirements?** If strict consistency needed, use distributed locks (slower but accurate)
+- **Read vs Write ratio?** High read: fewer shards + longer cache. High write: more shards + shorter cache.
+
+**Similar Use Cases:**
+- **Twitter**: Tweet like counts (50+ shards per tweet)
+- **Facebook**: Post engagement metrics (distributed across datacenters)
+- **Reddit**: Upvote/downvote counters (sharded + eventual consistency)
+- **Quora**: Answer view tracking (time-series sharding)
+
+---
 
 ### Why Sharded Counters?
 
@@ -2598,13 +2896,48 @@ class ShardedCounter:
 
 ---
 
-<!-- TOC --><a name="7-youtube"></a>
+
 # 7. YouTube - Video Streaming Platform
 
 > **📌 Quick Summary**: Large-scale video sharing platform with encoding, storage, and CDN delivery  
 > **Scale**: 2B+ users, 500hrs uploaded/min, 1B+ hours watched daily | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/cdd2be4a-a2b6-4cf8-8f17-e753afd0ad9d)
+![YouTube High-Level Architecture](https://github.com/user-attachments/assets/cdd2be4a-a2b6-4cf8-8f17-e753afd0ad9d)
+
+**🖼️ YouTube High-Level Upload and Streaming Flow:**
+
+This diagram illustrates YouTube's simplified upload-to-delivery pipeline:
+
+**Upload Pipeline (Left to Right):**
+1. **User Upload** → Web servers receive video files (up to 256GB per video)
+2. **Metadata Storage** → MySQL stores video metadata (title, description, uploader ID, timestamp)
+3. **Temporary Storage** → Video stored temporarily while awaiting encoding
+4. **Encoding Queue** → Tasks queued for video processing (2.1 in diagram)
+5. **Encoder + Transcoder** (2.2 in diagram):
+   - **Compression**: Reduce file size using H.264/H.265 (VP9/AV1 for efficiency)
+   - **Multi-Resolution Transcoding**: Generate 2160p/1440p/1080p/720p/480p/360p/240p/144p
+   - **Thumbnail Extraction**: Create 3-4 thumbnail options at different timestamps
+   - **Audio Extraction**: Separate audio tracks for adaptive streaming
+6. **Blob Storage** → Processed videos stored in distributed storage (similar to GFS/S3)
+7. **CDN Distribution** → Popular videos pushed to CDN edge locations
+
+**Streaming Pipeline (Right to Left):**
+1. **User Request** → Client requests video via player
+2. **CDN Delivery** → If cached at CDN edge (low latency ~1-5ms)
+3. **Origin Fetch** → If not cached, fetch from blob storage (higher latency ~50-200ms)
+4. **Adaptive Bitrate** → Client selects resolution based on network speed
+
+**Key Design Decisions:**
+- **Asynchronous Processing**: Upload completes immediately, encoding happens in background
+- **CDN Strategy**: Only push popular videos to CDN (80/20 rule - 20% videos = 80% views)
+- **Multi-Resolution Storage**: Store all resolutions to avoid real-time transcoding
+- **Blob Storage Choice**: Optimized for large objects, sequential reads, high throughput
+
+**Interview Talking Points:**
+- Why async encoding? User experience (don't block upload), resource optimization (batch processing)
+- CDN vs Origin serving: Cost trade-off (CDN expensive but fast, origin cheaper but slower)
+- Storage explosion: 1 video → 8 resolutions × 1.5 codec overhead = 12x storage cost
+- Handling viral videos: Predictive CDN push using ML models (trending detection)
 
 ### System Requirements
 
@@ -2652,7 +2985,99 @@ class ShardedCounter:
 4. Analytics: Track views, watch time, engagement
 ```
 
-![image](https://github.com/user-attachments/assets/34180cb8-fefd-40b0-8d0a-48944237cd43)
+![YouTube Detailed Component Architecture](https://github.com/user-attachments/assets/34180cb8-fefd-40b0-8d0a-48944237cd43)
+
+**🖼️ YouTube Detailed Multi-Tier Storage and Component Architecture:**
+
+This diagram reveals YouTube's production-grade architecture with specialized component responsibilities:
+
+**Frontend Layer:**
+- **Load Balancers**: Distribute traffic across regions using GeoDNS (route users to nearest datacenter)
+- **Web Servers**: Handle HTTP requests, serve HTML/JS/CSS for player interface
+- **Application Servers**: Business logic layer (authentication, authorization, recommendation engine)
+
+**Data Storage Tier (Multi-Database Strategy):**
+1. **MySQL (User + Metadata Storage)**:
+   - **User Data**: Profiles, subscriptions, playlists, watch history
+   - **Video Metadata**: Title, description, tags, upload timestamp, channel ID
+   - **Relational Data**: Comments, likes (foreign keys to user_id, video_id)
+   - **Sharding Strategy**: Shard by user_id (user data) and video_id (video metadata)
+   
+2. **Bigtable (Thumbnail Storage)**:
+   - **Why Bigtable?** Optimized for high throughput key-value storage (millions of QPS)
+   - **Data**: Thumbnails (each video has 3-4 thumbnails, each <10MB)
+   - **Access Pattern**: Read-heavy, rarely updated after upload
+   - **Scale**: Billions of thumbnails, petabytes of data
+
+3. **Upload Storage (Temporary Buffer)**:
+   - **Purpose**: Hold raw uploaded videos before encoding completes
+   - **Technology**: Fast SSD storage for quick writes
+   - **Retention**: Delete after encoding completes (24-48 hours)
+   - **Scale**: Handles 500+ hours of video uploaded per minute
+
+**Video Processing Pipeline:**
+- **Encoders**: Worker pool consuming tasks from encoding queue
+  - CPU-intensive: Use GPU clusters for faster encoding (NVIDIA Tesla for H.264)
+  - Parallel processing: Split long videos into chunks, encode in parallel, stitch together
+  - Priority queue: Verified channels get faster processing
+  
+- **Blob Storage (Video Files)**:
+  - **Technology**: GFS (Google File System) or S3-like distributed object storage
+  - **Data**: All video resolutions (144p through 2160p/4K)
+  - **Redundancy**: 3x replication across datacenters
+  - **Access Pattern**: Write-once, read-many (WORM)
+  - **Cost Optimization**: Cold videos moved to cheaper archival storage (Nearline/Coldline)
+
+**Content Delivery Strategy (Three-Tier Serving):**
+
+1. **CDN (Edge Locations)**:
+   - **Purpose**: Serve most popular content with lowest latency
+   - **Cache Hit Rate**: ~90% for viral videos
+   - **Technology**: Google Global Cache, Akamai, Cloudflare
+   - **TTL**: Popular videos cached for days, trending content for hours
+   
+2. **Colocation Sites**:
+   - **Purpose**: Regional serving tier between CDN and origin
+   - **Use Case**: Moderately popular content (10K-1M views)
+   - **Location**: Internet Service Provider (ISP) datacenters (negotiated deals)
+   - **Cost**: Cheaper than full CDN, closer than origin datacenter
+   - **Example**: YouTube caches at Comcast, Verizon, AT&T facilities
+   
+3. **Origin Servers (Blob Storage)**:
+   - **Purpose**: Long-tail content (older videos, niche content)
+   - **Cache Miss Rate**: ~10% of requests fall through to origin
+   - **Latency**: 200-500ms (acceptable for less popular content)
+
+**Key Architectural Insights:**
+
+**Cost Optimization:**
+- **CDN ($$$)**: Only 20% of videos (viral content)
+- **Colocation ($$)**: 30% of videos (moderately popular)
+- **Origin ($)**: 50% of videos (long-tail content)
+- **Total Savings**: 60% cost reduction vs serving everything from CDN
+
+**Scalability Numbers:**
+- **500+ hours** of video uploaded per minute
+- **1 billion+ hours** watched daily
+- **Encoding Throughput**: Process 8 resolutions per video in <10 minutes (parallel GPU encoding)
+- **Storage Growth**: +100 petabytes per year
+
+**Interview Trade-Off Discussions:**
+
+| Decision | Why This Choice? | Trade-Off |
+|----------|-----------------|------------|
+| **MySQL for Users** | Strong consistency, ACID transactions | Limited horizontal scaling (use sharding) |
+| **Bigtable for Thumbnails** | High throughput, low latency key-value | No complex queries (must know exact key) |
+| **Multi-Tier CDN** | Cost-performance balance | Complexity in cache invalidation |
+| **Async Encoding** | Better UX (fast upload completion) | Delay before video available (1-10 min) |
+| **Multiple Resolutions** | Adaptive bitrate streaming | 12x storage overhead (amortized over views) |
+
+**Real-World Numbers (2024):**
+- **Daily Views**: 5+ billion
+- **Peak Concurrent Users**: 30+ million
+- **Average Video Size (1080p)**: 1GB per 10 minutes
+- **Encoding Cost**: $0.01-0.05 per minute of video (GPU cluster amortized)
+- **Storage Cost**: $0.02/GB/month (decreases to $0.001/GB for cold storage)
 
 ---
 
@@ -2819,7 +3244,71 @@ Recovers (8 Mbps)      → Resume 720p chunks
 - ✅ Integration with CDN
 - ✅ Cost-effective for cold storage
 
-![image](https://github.com/user-attachments/assets/bfdff910-3eec-4158-a205-24eea8b51b96)
+![YouTube Storage Strategy - Cost vs Performance Trade-offs](https://github.com/user-attachments/assets/bfdff910-3eec-4158-a205-24eea8b51b96)
+
+**🖼️ YouTube Multi-Tier Storage Strategy:**
+
+This diagram illustrates YouTube's intelligent three-tier serving infrastructure balancing cost, performance, and scale:
+
+**Tier 1: CDN (Content Delivery Network)**
+- **Purpose**: Lowest latency for most popular videos (hot content)
+- **Coverage**: Top 20% of videos generating 80% of traffic (Pareto principle)
+- **Cache Hit Rate**: 85-95% for viral/trending content
+- **Latency**: 1-10ms (edge locations near users)
+- **Cost**: Highest ($$$) - $0.08-0.15 per GB served
+- **Use Case**: Newly uploaded videos from popular channels, trending content, recently watched
+
+**Tier 2: Colocation Centers**
+- **Purpose**: Regional caching for moderately popular videos (warm content)
+- **Partnership Model**: YouTube installs cache servers inside ISP datacenters (Comcast, Verizon, AT&T)
+- **Coverage**: 30-40% of videos with 10K-1M views
+- **Latency**: 10-50ms (within ISP network, no internet backbone traversal)
+- **Cost**: Medium ($$) - $0.02-0.05 per GB (negotiated wholesale rates with ISPs)
+- **Benefit**: Reduces ISP bandwidth costs (win-win), improves user experience
+
+**Tier 3: Origin Servers (Blob Storage)**
+- **Purpose**: Long-tail content, older videos, niche content (cold content)
+- **Coverage**: 50-60% of videos with <10K views
+- **Latency**: 50-300ms (datacenter to user, multiple hops)
+- **Cost**: Lowest ($) - $0.01-0.02 per GB from origin storage
+- **Storage Tier**: Hot data on SSD, cold data on HDD, archival on tape/Nearline
+- **Access Pattern**: Infrequent views, acceptable higher latency
+
+**Decision Flow (Video Serving Logic):**
+```
+1. User requests video → GeoDNS routes to nearest edge
+2. Check CDN cache → Hit? Serve immediately (1-5ms)
+3. Cache miss → Check colocation center → Hit? Serve (10-50ms)
+4. Colocation miss → Fetch from origin → Serve (50-300ms) + cache at colocaton
+5. Popular videos promoted to CDN after threshold views
+```
+
+**Cost Optimization Calculations:**
+- **Scenario**: 1 billion video views per day, average 5MB per view = 5 petabytes/day
+- **All-CDN**: 5PB × $0.12/GB = $600K/day = $220M/year
+- **Hybrid (20% CDN, 30% Colocation, 50% Origin)**:
+  - CDN: 1PB × $0.12 = $120K/day
+  - Colocation: 1.5PB × $0.03 = $45K/day
+  - Origin: 2.5PB × $0.015 = $37.5K/day
+  - **Total**: $202K/day = $74M/year
+  - **Savings**: $146M/year (66% cost reduction)
+
+**Consistency vs Availability Trade-Offs:**
+- **View Counters**: Eventually consistent (acceptable delay of 5-10 minutes)
+- **Video Availability**: Strongly consistent (video must be watchable immediately after encoding)
+- **Recommendation Feed**: Eventually consistent (personalization can lag by hours)
+- **User Data** (subscriptions, playlists): Strongly consistent (MySQL with ACID)
+
+**Database Choice Rationale:**
+- **MySQL for User/Metadata**: Structured data, relational queries (joins), ACID transactions needed
+- **Bigtable for Thumbnails**: High-throughput key-value access, no complex queries, petabyte-scale
+- **Why NOT NoSQL for Users?** Need strong consistency (subscriptions, billing), complex queries (recommendations)
+
+**Interview Trade-Off Questions:**
+1. **Q**: Why not serve everything from CDN? **A**: Cost-prohibitive ($220M vs $74M), 50% of videos watched <10 times
+2. **Q**: Why use Bigtable for thumbnails vs MySQL? **A**: Bigtable handles 10M+ reads/sec, thumbnails don't need relations
+3. **Q**: Consistency model for view counts? **A**: Eventually consistent (sharded counters, acceptable 5min delay)
+4. **Q**: How handle CDN cache invalidation? **A**: Short TTL (1 hour) for trending content, versioned URLs for updates
 
 ---
 
@@ -2934,13 +3423,28 @@ Asynchronous (background):
 
 ---
 
-<!-- TOC --><a name="8-quora"></a>
+
 # 8. Quora - Q&A Platform
 
 > **📌 Quick Summary**: Knowledge-sharing platform with ML-powered recommendations and ranking  
 > **Scale**: 300M+ monthly users, 400M+ questions, real-time content | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/c5b8ad91-5008-46e4-b699-7fef5c446e8b)
+![Quora System Architecture](https://github.com/user-attachments/assets/c5b8ad91-5008-46e4-b699-7fef5c446e8b)
+
+**🖼️ Quora Polyglot Persistence Architecture:**
+
+Quora's architecture demonstrates **polyglot persistence** - using multiple specialized databases for different data types:
+
+**Storage Layer Breakdown:**
+1. **MySQL** (Relational Data): Questions, answers, comments, users - needs strong consistency and ACID transactions
+2. **HBase** (Analytics): View counts, rankings, ML features - high-throughput writes, batch processing
+3. **Blob Storage**: Images/videos in posts - served via CDN
+4. **Memcached**: Query result caching - reduces MySQL load
+5. **Redis**: Real-time counters - atomic increments for view counts
+
+**Key Insight**: Using Redis for counters (10K+ increments/sec) frees MySQL for critical transactional data. HBase handles analytics workloads (feature extraction, ranking computation) that would overwhelm relational databases.
+
+---
 
 ### System Requirements
 
@@ -2978,7 +3482,9 @@ Asynchronous (background):
 | **Kafka** | Event streaming | Apache Kafka | Async tasks, notifications, analytics |
 | **Search Engine** | Full-text search | Elasticsearch | Question/answer search |
 
-![image](https://github.com/user-attachments/assets/f0db48d7-31a8-4d82-8053-92c3a8f7d62b)
+![Quora ML Compute Servers Architecture](https://github.com/user-attachments/assets/f0db48d7-31a8-4d82-8053-92c3a8f7d62b)
+
+**🖼️ Quora Recommendation Engine:** Compute servers with high RAM + CPU run ML models for answer ranking and personalization. Features extracted from HBase (view patterns, upvote history, topic preferences) feed into ranking algorithms. Batch processing computes recommendations offline, online serving layer (Redis-cached) delivers sub-50ms. Separates compute-heavy ML workloads from transactional databases.
 
 ---
 
@@ -3084,7 +3590,9 @@ def sync_to_hbase():
 
 ## Asynchronous Task Processing
 
-![image](https://github.com/user-attachments/assets/0695a93b-ee0b-4399-b1c9-79613dacc3fa)
+![Quora Kafka-Based Async Task Processing](https://github.com/user-attachments/assets/0695a93b-ee0b-4399-b1c9-79613dacc3fa)
+
+**🖼️ Quora Async Job Distribution:** Updated design offloads non-urgent tasks from synchronous API flow. Kafka disseminates jobs to specialized queues: view counter updates (sharded counters pattern), notification system (push notifications to followers), analytics pipelines (BigQuery aggregations), content highlighting (ML-based topic extraction). Each queue processed by dedicated worker pools via cron jobs. Reduces API response latency by 60% (sub-100ms), improves scalability by decoupling write-heavy operations.
 
 ### Kafka-Based Event Architecture
 
@@ -3124,7 +3632,9 @@ User Action → API Server → Kafka Topics:
 
 ## Real-Time Updates: Long Polling
 
-![image](https://github.com/user-attachments/assets/23702cfb-22d2-4d48-a705-bca788384b80)
+![Quora Long Polling for Real-Time Updates](https://github.com/user-attachments/assets/23702cfb-22d2-4d48-a705-bca788384b80)
+
+**🖼️ Real-Time Features via Long Polling:** For comments, upvotes, downvotes requiring frequent updates, Quora uses long polling instead of traditional polling. Client requests updates, server holds connection open for up to 60 seconds until new data arrives (immediate response if available). Reduces unnecessary requests by 95% vs polling every 5 seconds (from 12 requests/min to 1 request/min when idle). More efficient than WebSockets for infrequent updates, simpler infrastructure (HTTP-based, works through proxies).
 
 ### Why Not Simple Polling?
 
@@ -3252,13 +3762,15 @@ def increment_view_count(answer_id):
 
 ---
 
-<!-- TOC --><a name="9-google-map"></a>
+
 # 9. Google Maps - Navigation & Location Services
 
 > **📌 Quick Summary**: Real-time routing, traffic prediction, and location search at global scale  
 > **Scale**: 1B+ users, 220+ countries, 25M+ updates/day | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/8cd295ae-e8eb-4784-abe6-93632629208e)
+![Google Maps Segment-Based Routing Architecture](https://github.com/user-attachments/assets/8cd295ae-e8eb-4784-abe6-93632629208e)
+
+**🖼️ Google Maps Segment Architecture:** Divides world into segments (e.g., 10km × 10km), each containing road network graph. Segment adder assigns unique IDs via ID generator, server allocator distributes segments across servers, key-value store maintains segment-to-server mappings. For routing queries, graph processing service identifies source/destination segments, connects to relevant servers, computes shortest path using A* or contraction hierarchies. Multi-segment routes computed by stitching paths across segment boundaries.
 
 ### System Requirements
 
@@ -3281,7 +3793,9 @@ def increment_view_count(answer_id):
 
 ## High-Level Architecture
 
-![image](https://github.com/user-attachments/assets/37d09a35-828b-43f8-b0f6-cd3eca4aaa6f)
+![Google Maps Segment Addition Workflow](https://github.com/user-attachments/assets/37d09a35-828b-43f8-b0f6-cd3eca4aaa6f)
+
+**🖼️ Adding New Road Segments:** Segment adder receives new segment with lat/long boundary coordinates + road network graph → Unique ID generator assigns segment ID (distributed ID generation via Snowflake) → Server allocator assigns segment to available server (load balancing based on current segment count per server) → Segment graph hosted on assigned server → Mapping stored in key-value store (segment_id → server_id) + boundary coordinates stored separately (segment_id → lat/long bounds). Enables efficient routing query processing by quick segment lookup.
 
 ### Core Components
 
@@ -3364,7 +3878,9 @@ def increment_view_count(answer_id):
 
 ## Routing Request Flow
 
-![image](https://github.com/user-attachments/assets/d043a28a-df21-4468-9d19-4e5ba7de6d37)
+![Google Maps Real-Time Traffic Analytics Pipeline](https://github.com/user-attachments/assets/d043a28a-df21-4468-9d19-4e5ba7de6d37)
+
+**🖼️ Traffic Data Processing:** Pub-sub system collects location streams (device, timestamp, lat/long) from all map servers (millions of active users) → Apache Spark reads data from pub-sub, applies ML models for traffic prediction, clustering (identify events/gatherings), anomaly detection (accidents, road closures), road discovery (new roads from GPS trails) → Analytics improve ETA accuracy by 30%, enable real-time rerouting. Data pipeline handles 10M+ location updates per second, processes in sub-minute latency.
 
 ### Step-by-Step
 
@@ -3583,13 +4099,15 @@ Result: 1000x faster, still optimal path
 
 ---
 
-<!-- TOC --><a name="10-yelp"></a>
+
 # 10. Yelp - Location-Based Business Search
 
 > **📌 Quick Summary**: Place discovery using dynamic QuadTree segments with proximity search  
 > **Scale**: 200M+ reviews, 100M+ places, <100ms search latency | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/7a121032-5b3b-4d47-8f78-7940cb912c9d)
+![Yelp QuadTree Dynamic Segmentation](https://github.com/user-attachments/assets/7a121032-5b3b-4d47-8f78-7940cb912c9d)
+
+**🖼️ Yelp QuadTree Spatial Indexing:** Solves uneven place distribution by dynamic segment splitting. When place count exceeds threshold (e.g., 500), segment divides into 4 quadrants recursively. Tree structure: internal nodes represent segments, leaf nodes store actual places. Doubly-linked list connects neighboring segments for efficient boundary queries (find restaurants within 5km crosses multiple leaf nodes). Search starts at root, traverses to target leaf, fetches neighboring segments if needed. Handles dense urban areas (small segments) and sparse rural areas (large segments) efficiently.
 
 ### System Requirements
 
@@ -3978,13 +4496,15 @@ score = (
 
 ---
 
-<!-- TOC --><a name="11-uber"></a>
+
 # 11. Uber - Ride-Hailing Platform
 
 > **📌 Quick Summary**: Real-time driver-rider matching with optimized routing and payments  
 > **Scale**: 150M+ users, 7M+ drivers, 25M+ trips/day | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/dd019f80-ee5f-4bf5-b3ce-f0a8dc9248a5)
+![Uber Hybrid QuadTree + Hash Table Architecture](https://github.com/user-attachments/assets/dd019f80-ee5f-4bf5-b3ce-f0a8dc9248a5)
+
+**🖼️ Uber Driver-Rider Matching with Hybrid Index:** Combines QuadTree (spatial indexing) with hash table (fast updates). QuadTree updated every 15 seconds (batch process), hash table updated every 4 seconds (real-time driver locations). For matching: QuadTree finds drivers in rider's segment, hash table provides latest GPS coordinates, ranking algorithm considers distance + ETA + driver rating. Precomputed routing uses contraction hierarchies (partitioned graph with parallel processing across segments). Redis stores driver states (available/busy), Cassandra persists trip history.
 
 ### System Requirements
 
@@ -4181,7 +4701,9 @@ def find_nearby_drivers(rider_lat, rider_lng, radius_km=5, car_type="uberX"):
 
 ## Routing: Shortest Path at Scale
 
-![image](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+![Apache Kafka Payment Processing Flow](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+
+**🖼️ Kafka Payment Pipeline:** Order creator \u2192 Kafka (order topic) \u2192 Order processor validates \u2192 Kafka (intent topic) \u2192 PSP transaction \u2192 Kafka (result topic) \u2192 Order writer persists. Asynchronous, fault-tolerant, replay-able for failed payments.
 
 ### Why Not Dijkstra?
 
@@ -4254,7 +4776,9 @@ Query spanning partitions:
 
 ## Payment Processing: Apache Kafka
 
-![image](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+![Apache Kafka Payment Architecture (Detailed)](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+
+**🖼️ Detailed Kafka Payment Flow:** Trip completion triggers order creator \u2192 Money movement info published to Kafka (amount, rider ID, driver ID, payment method) \u2192 Order processor validates business rules (sufficient balance, valid payment method) \u2192 Intent sent to Kafka \u2192 PSP integration (Stripe/Braintree) processes charge \u2192 Result (success/failure) written to Kafka \u2192 Order writer updates database (transaction history, wallet balance). **Three-topic pattern:** orders \u2192 intents \u2192 results enables audit trail, retry logic, exactly-once semantics.
 
 ### Event-Driven Payment Flow
 
@@ -4389,13 +4913,15 @@ Query spanning partitions:
 
 ---
 
-<!-- TOC --><a name="12-twitter"></a>
+
 # 12. Twitter - Real-Time Microblogging Platform
 
 > **📌 Quick Summary**: Distributed social network with real-time timeline, search, and analytics  
 > **Scale**: 450M+ users, 500M+ tweets/day, 100ms search, 15s indexing latency | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/af48a651-4620-43b9-b9b0-677139170393)
+![Twitter Manhattan + Lucene Dual-Index Architecture](https://github.com/user-attachments/assets/af48a651-4620-43b9-b9b0-677139170393)
+
+**🖼️ Twitter Storage Strategy:** Manhattan (distributed KV store) handles tweets, accounts, DMs with millions of QPS across multiple clusters (read-only vs heavy read-write separation). Uses RocksDB storage engine per node. Apache Lucene provides dual-index search: real-time index (recent tweets, past week) stored in RAM for <100ms latency, full index (historical tweets) uses batch processing with lower priority. Indexing latency ~15 seconds from tweet creation. Pelikan cache (Twemcache/Redis replacement) provides high-throughput low-latency caching layer. Multi-tier storage: Hot data (Manhattan) → Warm cache (Pelikan) → Cold analytics (BigQuery via Kafka).
 
 ### System Requirements
 
@@ -4419,7 +4945,9 @@ Query spanning partitions:
 
 ## Data Storage Architecture
 
-![image](https://github.com/user-attachments/assets/3b6dc27e-79d9-4c33-9645-2a922b35ba75)
+![Twitter Complete System Architecture](https://github.com/user-attachments/assets/3b6dc27e-79d9-4c33-9645-2a922b35ba75)
+
+**🖼️ Twitter End-to-End Data Flow:** Load balancer routes requests → **Tweet Service**: Handles /postTweet API, stores text/metadata in Manhattan/MySQL, attachments in Blobstore, streams events to Kafka → Cloud Pub/Sub → BigQuery (analytics) + Bigtable (serving). **Timeline Service**: Handles /viewHome_timeline, checks CDN first, fetches from Manhattan + sharded counters (engagement metrics), returns Top-K tweets. **Search Service**: /searchTweet queries Apache Lucene real-time index (RAM, recent tweets <15s latency) + full index (batch-processed historical), ranks by relevance/recency/engagement. ZooKeeper manages configuration, Zipkin traces request flows.
 
 ### Storage Layer Breakdown
 
@@ -4879,13 +5407,15 @@ Result:
 
 ---
 
-<!-- TOC --><a name="13-newsfeed"></a>
+
 # 13. Newsfeed System - Social Media Feed
 
 > **📌 Quick Summary**: Personalized content ranking and delivery for social networks  
 > **Scale**: Billions of posts, millions of concurrent users, <200ms feed load | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/ec84d0b0-7edd-4ffb-a4fb-a8b4e296f0ac)
+![Newsfeed Hybrid Fan-Out Architecture](https://github.com/user-attachments/assets/ec84d0b0-7edd-4ffb-a4fb-a8b4e296f0ac)
+
+**🖼️ Newsfeed Fan-Out Strategy:** Hybrid approach combining fan-out-on-write (celebrities) and fan-out-on-read (regular users). When user posts: if followers <1000, write to each follower's newsfeed cache (fan-out-on-write); if followers >100K (celebrity), store in user's own outbox (fan-out-on-read). Timeline generation: fetch pre-computed feed from cache (fan-out-on-write entries) + fetch celebrity posts on-demand (fan-out-on-read) + merge and rank. Trade-off: Fan-out-on-write = fast reads but slow writes (1M followers = 1M writes), Fan-out-on-read = fast writes but slower reads (must query multiple celebrity outboxes). Ranking service applies ML model to merged feed for personalization.
 
 ### System Requirements
 
@@ -5211,13 +5741,15 @@ def new_post_notification(follower_ids, post_id):
 
 ---
 
-<!-- TOC --><a name="14-instagram"></a>
+
 # 14. Instagram - Photo/Video Sharing
 
 > **📌 Quick Summary**: Media-heavy social platform with feed, stories, and explore  
 > **Scale**: 2B+ users, 95M+ photos/day, 100M+ stories/day | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/c295add8-8097-4665-b3cf-b73c53e1e156)
+![Instagram Push-Pull Hybrid CDN Architecture](https://github.com/user-attachments/assets/c295add8-8097-4665-b3cf-b73c53e1e156)
+
+**🖼️ Instagram Feed Generation Strategy:** Hybrid push-pull model based on follower count. **Push-based users** (<1000 followers): Fan-out-on-write, pre-compute followers' feeds, fast read times. **Pull-based users** (celebrities >100K followers): Fan-out-on-read, followers fetch on-demand, avoids write amplification. CDN caching: Popular celebrity content cached at edge (3-tier: Edge CDN → Regional cache → Origin blob storage), regular users served from application servers with Redis cache. Load balancer routes: Read requests → Nearest CDN first, write requests → Application servers → Database shards. Handles millions of concurrent users with low latency (<50ms p99).
 
 ### System Requirements
 
@@ -5248,7 +5780,9 @@ def new_post_notification(follower_ids, post_id):
 
 **Solution**: Segment users and apply different strategies
 
-![image](https://github.com/user-attachments/assets/324bb9d4-9f9e-46d0-92ff-40701bbffc3e)
+![Instagram Feed Generation Detailed Flow](https://github.com/user-attachments/assets/324bb9d4-9f9e-46d0-92ff-40701bbffc3e)
+
+**🖼️ Instagram Push vs Pull Strategy Visualization:** Diagram illustrates decision tree: followers <1000 → fan-out-on-write (pre-compute feeds, write to follower caches), followers >100K → fan-out-on-read (celebrity posts fetched on-demand). Shows data flow: Post creation → Database write → Fan-out service checks follower count → Conditional routing (push workers write N feeds vs pull index stores celebrity post reference) → Timeline generation merges both sources → Ranking algorithm (ML model) applies engagement prediction → Serve to user. CDN integration shown for media (images/videos) separate from feed text.
 
 ---
 
@@ -5568,13 +6102,15 @@ Benefits:
 
 ---
 
-<!-- TOC --><a name="15-whatsapp"></a>
+
 # 15. WhatsApp - Messaging Platform
 
 > **📌 Quick Summary**: End-to-end encrypted messaging with groups, media, and real-time delivery  
 > **Scale**: 2B+ users, 100B+ messages/day, <200ms delivery | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/13e8b5c6-48fc-4dd6-a69e-d907d38bbf28)
+![WhatsApp Group Messaging via Kafka Topics](https://github.com/user-attachments/assets/13e8b5c6-48fc-4dd6-a69e-d907d38bbf28)
+
+**🖼️ WhatsApp Group Message Flow:** User A sends message to Group/A → WebSocket server forwards to message service → Kafka topic created per group (group = Kafka topic, senders = producers, receivers = consumers) → Group service fetches group members from MySQL cluster (geographically distributed replicas + Redis cache for low latency) → Group message handler retrieves member list → Delivers message to each member's WebSocket connection. **Key features:** End-to-end encryption (Signal Protocol), FIFO ordering (Kafka guarantees), at-least-once delivery (retry on failure), offline message queue (messages persist in Kafka until user comes online). **Scalability:** Kafka partitions by group_id, horizontal scaling of message handlers, Redis cache reduces MySQL load.
 
 ### System Requirements
 
@@ -6007,13 +6543,15 @@ Benefits:
 
 ---
 
-<!-- TOC --><a name="16-typeahead"></a>
+
 # 16. Typeahead Suggestion System - Autocomplete
 
 > **📌 Quick Summary**: Real-time query suggestions as user types (Google Search, YouTube, Twitter)  
 > **Scale**: Billions of queries/day, <100ms suggestion latency | **Complexity**: ⭐⭐⭐⭐☆
 
-![image](https://github.com/user-attachments/assets/87be1f0b-97f7-47d2-8cff-8fce02a0e11c)
+![Typeahead Trie with Offline Updates](https://github.com/user-attachments/assets/87be1f0b-97f7-47d2-8cff-8fce02a0e11c)
+
+**🖼️ Typeahead Suggestion System Architecture:** Collection service gathers raw search queries → Aggregator (MapReduce) computes prefix frequencies from HDFS logs → Cassandra stores aggregated data (prefix → frequency mappings) → Trie builder creates/updates trie structures offline (not real-time to avoid user-facing latency) → Tries stored in MongoDB (NoSQL document store, easy serialization), distributed via ZooKeeper to shards → Redis caches hot prefixes for <1ms lookup. **Trie optimization:** Reduced depth (group rare terms), top-k stored at each node (precomputed suggestions), geographically partitioned tries (US vs EU different trending queries). **Latency:** <10ms end-to-end (Redis cache hit), <50ms (MongoDB trie lookup).
 
 ### System Requirements
 
@@ -6389,13 +6927,15 @@ Routing:
 
 ---
 
-<!-- TOC --><a name="17-google-docs"></a>
+
 # 17. Google Docs - Collaborative Document Editing
 
 > **📌 Quick Summary**: Real-time collaborative editing with conflict resolution and versioning  
 > **Scale**: 2B+ documents, millions of concurrent editors, <50ms sync | **Complexity**: ⭐⭐⭐⭐⭐
 
-![image](https://github.com/user-attachments/assets/ac643c4f-36f7-4b4f-a4c3--5d8b76d825ca)
+![Google Docs Operational Transformation (OT)](https://github.com/user-attachments/assets/ac643c4f-36f7-4b4f-a4c3--5d8b76d825ca)
+
+**🖼️ Google Docs Real-Time Collaboration:** WebSocket connections enable bidirectional communication between clients and servers. **Conflict resolution:** Operational Transformation (OT) and CRDTs (Conflict-free Replicated Data Types) transform concurrent edits to maintain consistency (e.g., User A inserts at position 5 while User B deletes at position 3 → OT adjusts A's position to 4). **Time-series database** preserves operation order across distributed servers. **Replication:** Gossip protocol replicates operations within same datacenter (<5ms), async replication across datacenters (50-200ms). **Storage:** CRDTs stored in Redis (in-memory, fast conflict merging), periodic snapshots to RDBMS (PostgreSQL/MySQL) and blob storage (document versions). **Availability:** Multiple WebSocket servers per region, component isolation prevents cascading failures, CDN serves static assets (images/videos embedded in docs).
 
 ### System Requirements
 
@@ -7218,4 +7758,3 @@ START: Newsfeed Fan-Out Strategy
 ---
 
 **End of Phase 5 Enhancements** 🎉
-
