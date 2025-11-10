@@ -6,6 +6,9 @@
 
 ## 📚 Table of Contents
 
+### 📋 Quick Reference
+- **[SDE-II Interview Cheat Sheet](#-sde-ii-interview-cheat-sheet)** - Capacity numbers, latency table, technology selection, patterns, red flags
+
 ### Part I: Core Concepts (1-6)
 - **[1. Concepts](#1-concepts)**
   - [1.1 RPC (Remote Procedure Call)](#11-rpc-remote-procedure-call)
@@ -17,7 +20,7 @@
     - [1.4.3 Sharding](#143-sharding)
     - [1.4.4 Database Optimization](#144-database-optimization)
   - [1.5 Storage](#15-storage)
-    - [1.5.1 Object Storage](#151-object-storage)
+    - [1.5.1 Consistent Hashing](#151-consistent-hashing)
     - [1.5.2 Merkle Tree](#152-merkle-tree)
 - **[2. Content Delivery Network (CDN)](#2-content-delivery-network-cdn)**
 - **[3. Cache](#3-cache)**
@@ -30,22 +33,57 @@
 - **[6. Distributed Task Scheduler](#6-distributed-task-scheduler)**
 
 ### Part II: Real-World Systems (7-17)
-- **[7. YouTube](#7-youtube)**
-- **[8. Quora](#8-quora)**
-- **[9. Google Maps](#9-google-maps)**
-- **[10. Yelp](#10-yelp)**
-- **[11. Uber](#11-uber)**
-- **[12. Twitter](#12-twitter)**
-- **[13. Newsfeed System](#13-newsfeed-system)**
-- **[14. Instagram](#14-instagram)**
-- **[15. WhatsApp](#15-whatsapp)**
-- **[16. Typeahead Suggestion System](#16-typeahead-suggestion-system)**
-- **[17. Google Docs](#17-google-docs)**
+- **[7. YouTube](#7-youtube)** - Video streaming, transcoding, CDN
+- **[8. Quora](#8-quora)** - Content ranking, dual cache
+- **[9. Google Maps](#9-google-maps)** - Geospatial indexing, routing
+- **[10. Yelp](#10-yelp)** - Location-based search, QuadTree
+- **[11. Uber](#11-uber)** - Real-time matching, geohashing
+- **[12. Twitter](#12-twitter)** - Fan-out strategies, timeline generation
+- **[13. Newsfeed System](#13-newsfeed-system)** - Ranking algorithm, hybrid fan-out
+- **[14. Instagram](#14-instagram)** - Feed generation, blob storage
+- **[15. WhatsApp](#15-whatsapp)** - Messaging, end-to-end encryption
+- **[16. Typeahead Suggestion System](#16-typeahead-suggestion-system)** - Trie, autocomplete
+- **[17. Google Docs](#17-google-docs)** - Operational transformation, collaboration
 
 ### Part III: Advanced Design Tools
 - **[Pattern Index](#-comprehensive-pattern-index)** - 40+ design patterns with decision frameworks
 - **[Decision Trees](#-decision-trees-for-system-design)** - Database, Cache, Rate Limiter, Fan-Out strategies
 - **[Technology Comparison Matrix](#-technology-comparison-matrix)** - 25+ systems compared across 8 dimensions
+
+### Part IV: SDE-II Interview Essentials
+- **[Back-of-Envelope Calculations](#-sde-ii-interview-essentials)** - Power of 2, latency numbers, capacity estimation
+- **[RADIO Interview Framework](#-sde-ii-interview-essentials)** - 5-step method for any system design question
+- **[CAP Theorem Practical Examples](#-sde-ii-interview-essentials)** - CP vs AP decisions with real-world scenarios
+- **[Monolith vs Microservices](#-sde-ii-interview-essentials)** - Decision matrix, migration patterns
+- **[Authentication at Scale](#-sde-ii-interview-essentials)** - Session, JWT, OAuth, RBAC
+- **[Monitoring & Observability](#-sde-ii-interview-essentials)** - Metrics, logs, traces, Golden Signals
+- **[Common Interview Questions](#-sde-ii-interview-essentials)** - URL shortener, Instagram, Rate Limiter, Chat, Notifications
+- **[Mental Models & Heuristics](#-sde-ii-interview-essentials)** - Cache sizing, sharding triggers, SQL vs NoSQL
+- **[Red Flags to Avoid](#-sde-ii-interview-essentials)** - 7 common mistakes in interviews
+- **[Final Interview Checklist](#-sde-ii-interview-essentials)** - 10-point verification before answering
+
+### Part V: Code-Level Patterns
+- **[Circuit Breaker Pattern](#-code-level-system-design-patterns)** - Prevent cascading failures with state machine
+- **[Rate Limiter Implementation](#-code-level-system-design-patterns)** - Token bucket with Redis
+- **[Consistent Hashing](#-code-level-system-design-patterns)** - Virtual nodes for distributed caching
+- **[LRU Cache](#-code-level-system-design-patterns)** - Interview classic with O(1) operations
+- **[Bloom Filter](#-code-level-system-design-patterns)** - Space-efficient set membership
+- **[Exponential Backoff](#-code-level-system-design-patterns)** - Retry with jitter
+- **[Idempotency Key Pattern](#-code-level-system-design-patterns)** - Prevent duplicate payments
+- **[Database Connection Pooling](#-code-level-system-design-patterns)** - Reuse connections efficiently
+- **[Distributed Lock](#-code-level-system-design-patterns)** - Redis-based locking with Lua
+- **[Saga Pattern](#-code-level-system-design-patterns)** - Distributed transactions with compensations
+
+### Part VI: Infrastructure Patterns
+- **[API Gateway Patterns](#-api-gateway-patterns)** - Routing, auth, rate limiting, BFF pattern
+- **[Distributed Tracing](#-distributed-tracing)** - OpenTelemetry, trace propagation, sampling strategies
+- **[Database Deep-Dive](#️-database-deep-dive-for-interviews)** - Indexing, replication, sharding strategies
+
+### Part VII: Complete Interview Walkthroughs
+- **[Design Dropbox/Google Drive](#-more-system-design-interview-questions)** - File chunking, delta sync, conflict resolution
+- **[Design Netflix](#-more-system-design-interview-questions)** - Adaptive bitrate, encoding pipeline, recommendations
+- **[Design Web Crawler](#-more-system-design-interview-questions)** - URL frontier, Bloom filter, distributed crawling
+- **[Design Leaderboard](#-more-system-design-interview-questions)** - Redis Sorted Set, real-time ranking
 
 ---
 
