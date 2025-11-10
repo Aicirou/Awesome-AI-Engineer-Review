@@ -7758,3 +7758,4033 @@ START: Newsfeed Fan-Out Strategy
 ---
 
 **End of Phase 5 Enhancements** 🎉
+
+---
+
+# 🎯 SDE-II Interview Essentials
+
+## 📐 Back-of-the-Envelope Calculations
+
+> **Why this matters**: Interviewers expect you to estimate capacity, storage, and bandwidth in EVERY system design interview.
+
+### Power of 2 Table (Memorize This!)
+
+| Power | Exact Value | Approximate | Short Name |
+|-------|-------------|-------------|------------|
+| 2^10 | 1,024 | ~1 thousand | 1 KB |
+| 2^20 | 1,048,576 | ~1 million | 1 MB |
+| 2^30 | 1,073,741,824 | ~1 billion | 1 GB |
+| 2^40 | 1,099,511,627,776 | ~1 trillion | 1 TB |
+| 2^50 | ~1.1 × 10^15 | ~1 quadrillion | 1 PB |
+
+### Latency Numbers Every SDE Should Know (2025 Updated)
+
+| Operation | Latency | Relative Time |
+|-----------|---------|---------------|
+| **L1 cache reference** | 0.5 ns | 1 sec |
+| **L2 cache reference** | 7 ns | 14 sec |
+| **RAM reference** | 100 ns | 3 min |
+| **SSD random read** | 150 μs (150,000 ns) | 1.7 days |
+| **HDD seek** | 10 ms (10,000,000 ns) | 4 months |
+| **Network within datacenter** | 500 μs | 5.8 days |
+| **Network cross-country (US)** | 50 ms | 1.6 years |
+| **Network trans-Atlantic** | 150 ms | 4.8 years |
+
+**Key Takeaways:**
+- Memory is ~100,000x faster than disk
+- SSD is ~100x faster than HDD
+- Within-datacenter network is 100x faster than cross-country
+- **Design implication**: Cache in RAM, avoid network calls when possible
+
+### Typical System Capacity Numbers
+
+| Metric | Small System | Medium System | Large System |
+|--------|--------------|---------------|--------------|
+| **Users** | 10K-100K | 1M-10M | 100M+ |
+| **QPS (read)** | 100-1K | 10K-100K | 1M+ |
+| **QPS (write)** | 10-100 | 1K-10K | 100K+ |
+| **Storage** | 10GB-100GB | 1TB-10TB | 100TB-PB |
+| **Bandwidth** | 1 Mbps | 100 Mbps | 10+ Gbps |
+| **Servers** | 1-10 | 10-100 | 1000+ |
+
+### Estimation Framework (Use This Every Time!)
+
+```
+📝 Example: Design Twitter
+
+1. Assumptions (Always state these first!):
+   - 300M DAU (Daily Active Users)
+   - Each user tweets 2 times/day → 600M tweets/day
+   - Read:Write ratio = 100:1 (viewing >> posting)
+   - Average tweet size = 280 chars = 280 bytes (text only)
+   - 10% tweets have images (200KB each), 1% have videos (2MB each)
+
+2. Traffic Estimates:
+   - Write QPS = 600M / 86400 seconds ≈ 7K tweets/sec
+   - Peak Write QPS = 7K × 3 (assume 3x peak) = 21K/sec
+   - Read QPS = 7K × 100 = 700K reads/sec
+   - Peak Read QPS = 700K × 2 = 1.4M reads/sec
+
+3. Storage Estimates (5 years):
+   - Text: 600M tweets/day × 280 bytes × 365 × 5 = ~306TB
+   - Images: 60M/day × 200KB × 365 × 5 = ~22PB
+   - Videos: 6M/day × 2MB × 365 × 5 = ~22PB
+   - Total: ~44PB (mostly media!)
+
+4. Bandwidth Estimates:
+   - Write bandwidth = 7K tweets/sec × 280 bytes = 2 MB/s (text)
+   - With media: ~500 MB/s incoming
+   - Read bandwidth = 700K reads/sec × 280 bytes = 196 MB/s (text)
+   - With media: ~50 GB/s outgoing (this is why CDN is critical!)
+
+5. Memory Estimates (for cache):
+   - 80/20 rule: 20% of tweets generate 80% of traffic
+   - Cache 20% of daily tweets = 120M tweets
+   - Size = 120M × 280 bytes = 33.6 GB (text only)
+   - With thumbnails: ~2TB (fits in RAM across servers!)
+```
+
+### Quick Calculation Tricks
+
+**Tip 1: Simplify** 
+- 365 days/year ≈ 400 (easier mental math)
+- 86400 seconds/day ≈ 100K (simplifies division)
+
+**Tip 2: Powers of 10**
+- 1K = 10^3, 1M = 10^6, 1B = 10^9
+
+**Tip 3: Percentage to Fraction**
+- 20% = 1/5, 33% = 1/3, 25% = 1/4
+
+### Common Estimation Mistakes
+
+❌ **Don't:**
+- Spend >5 minutes on calculations (rough estimates OK!)
+- Get exact numbers (approximations are fine)
+- Forget to state assumptions
+- Ignore peak vs average (peak can be 2-10x)
+
+✅ **Do:**
+- Round aggressively (7,234 → 7K)
+- State assumptions clearly
+- Think in orders of magnitude
+- Consider read/write ratio
+
+---
+
+## 🎭 Interview Framework: The RADIO Method
+
+> **Use this structure in EVERY system design interview** - covers all bases interviewers expect.
+
+### R - Requirements (5 min)
+
+**Functional Requirements** (What the system does):
+```
+Example: URL Shortener
+✅ Given long URL, return short URL
+✅ Short URL redirects to original
+✅ Custom short URLs (optional)
+✅ Expiration time (optional)
+❌ Analytics (out of scope for now)
+❌ User accounts (simplify for interview)
+```
+
+**Non-Functional Requirements** (How well it performs):
+```
+✅ High availability (99.9% uptime)
+✅ Low latency (<100ms redirects)
+✅ Scalable (handle millions of URLs)
+✅ Read-heavy (100:1 read:write ratio)
+⚠️ Eventual consistency OK (not financial data)
+```
+
+**Scale Estimates**:
+```
+- 100M URLs shortened/month → ~40 writes/sec
+- 100:1 ratio → 4K redirects/sec
+- Storage: 100M × 500 bytes = 50GB/month
+- 5 year retention → 3TB
+```
+
+### A - API Design (5 min)
+
+**Design the interface FIRST** (shows you understand the problem):
+```
+POST /api/v1/shorten
+Request: { "long_url": "https://...", "expiry": "2025-12-31" }
+Response: { "short_url": "https://tiny.url/a3x9f", "expiry": 1735689600 }
+
+GET /api/v1/{short_code}
+Response: 302 Redirect to original URL
+```
+
+**Pro tip**: Mention versioning (/v1/), RESTful conventions, status codes
+
+### D - Data Model (10 min)
+
+**Design your schema** (SQL vs NoSQL decision):
+```sql
+-- URL Shortener Example (SQL works fine here)
+
+TABLE urls (
+  id BIGINT PRIMARY KEY,
+  short_code VARCHAR(10) UNIQUE NOT NULL,  -- indexed!
+  long_url TEXT NOT NULL,
+  user_id BIGINT,  -- if we add users later
+  created_at TIMESTAMP,
+  expiry_at TIMESTAMP,
+  click_count INT DEFAULT 0
+);
+
+INDEX idx_short_code ON urls(short_code);  -- CRITICAL for lookups!
+```
+
+**Key decisions to mention:**
+- Why this database? (SQL for simple schema, strong consistency)
+- What indexes? (short_code lookups are most common)
+- Sharding strategy? (range-based on ID or hash-based on short_code)
+
+### I - Infrastructure/High-Level Design (15 min)
+
+**Draw the boxes** (Load balancer → Servers → Database → Cache):
+
+```
+                 [Load Balancer]
+                        |
+        +---------------+----------------+
+        |               |                |
+   [App Server]   [App Server]    [App Server]
+        |               |                |
+        +-------+-------+--------+-------+
+                |                |
+           [Redis Cache]    [Primary DB]
+                                  |
+                          [Read Replicas]
+```
+
+**Discuss:**
+- **Load balancer**: Round-robin or least connections
+- **App servers**: Stateless, horizontally scalable
+- **Cache**: Redis for short_code → long_url lookups (99% hit rate)
+- **Database**: MySQL primary + read replicas (for analytics)
+- **CDN**: Not needed (redirects, not content delivery)
+
+### O - Optimizations & Deep Dives (15 min)
+
+**Interviewer will probe specific areas**:
+
+**1. Short Code Generation**:
+```
+Option A: Base62 encoding of auto-increment ID
+- Pros: Simple, no collisions, predictable length
+- Cons: Predictable (security issue?), single-point (ID generator)
+
+Option B: Hash (MD5) and take first 6-8 characters  
+- Pros: Distributed generation
+- Cons: Collision handling needed, longer codes
+
+Option C: Pre-generate pool of codes
+- Pros: Super fast writes, distributed
+- Cons: Coordination overhead, code "wastage"
+
+✅ Recommended: Base62 with distributed ID generator (Snowflake pattern)
+```
+
+**2. Cache Strategy**:
+```
+- Cache hot URLs (write-through cache)
+- TTL = 1 hour (URLs don't change often)
+- Cache hit ratio target: 95%+
+- Cache size: ~100MB for 1M hot URLs
+```
+
+**3. Database Scaling**:
+```
+- Vertical scaling: 64GB RAM, 16 cores (handles ~10K QPS)
+- Read replicas: For analytics queries (don't slow down writes)
+- Sharding: If >100M URLs/month, shard by hash(short_code) % N
+```
+
+**4. Handling Deleted/Expired URLs**:
+```
+- Soft delete (mark as deleted, don't remove row)
+- Background job cleans up daily (DELETE WHERE expiry_at < NOW())
+- Return 404 if expired/deleted
+```
+
+---
+
+## 🔥 CAP Theorem - Practical Examples
+
+> **Theory everyone knows, but can you apply it?** Interviewers want real-world trade-offs.
+
+### CAP Theorem Refresher
+
+**You can only choose 2 of 3:**
+- **C**onsistency: All nodes see the same data at the same time
+- **A**vailability: Every request receives a response (success or failure)
+- **P**artition Tolerance: System continues operating despite network failures
+
+**Reality**: Network partitions WILL happen, so you're really choosing between **CP** or **AP**.
+
+### Real-World System Examples
+
+#### CP Systems (Consistency + Partition Tolerance)
+
+**MongoDB (CP mode with replica sets)**:
+```
+Scenario: Bank account balance
+- User A transfers $100 to User B
+- Network partition splits replica set
+- PRIMARY becomes isolated from SECONDARIES
+- MongoDB BLOCKS writes until PRIMARY can reach majority
+- Result: System unavailable BUT data stays consistent
+
+Why CP: Can't have duplicate money (consistency > availability)
+```
+
+**HBase, Redis (CP with Sentinel/Cluster)**:
+- Master-slave with quorum-based writes
+- If master isolated, new master elected
+- Brief unavailability (<30s) during election
+
+#### AP Systems (Availability + Partition Tolerance)
+
+**Cassandra, DynamoDB (AP mode)**:
+```
+Scenario: Social media likes count
+- User likes a post
+- Network partition occurs
+- Write succeeds on 1 replica (quorum = 1)
+- Other replicas get update later (eventually consistent)
+- Brief period where like counts differ across nodes
+
+Why AP: Slight inconsistency OK (availability > consistency)
+```
+
+**Cassandra Tuning** (adjustable via quorum):
+```python
+# Write to 3 replicas, wait for 2 ACKs
+WRITE_CONSISTENCY = QUORUM  # More consistency, less availability
+
+# Write to 3 replicas, wait for 1 ACK
+WRITE_CONSISTENCY = ONE  # More availability, less consistency
+```
+
+### CA Systems (Consistency + Availability) - Myth!
+
+**Traditional RDBMS (Single Node)**:
+- MySQL, PostgreSQL on single server
+- No partition tolerance (if network fails, system fails)
+- Not distributed → Not CAP-relevant!
+
+**Real talk**: Once you distribute data, partitions happen. CA doesn't exist at scale.
+
+### Interview Question: "Would you use CP or AP for...?"
+
+| Use Case | Choice | Reasoning |
+|----------|--------|-----------|
+| **Banking transactions** | CP | Money must be correct, brief downtime acceptable |
+| **Social media likes** | AP | Slight delay in like count OK, must stay available |
+| **E-commerce inventory** | CP | Can't oversell items (consistency critical) |
+| **E-commerce product catalog** | AP | Showing old price briefly OK vs site down |
+| **Ride-sharing driver location** | AP | Slightly stale location OK vs no drivers shown |
+| **Healthcare patient records** | CP | Wrong diagnosis data is unacceptable |
+| **Netflix recommendations** | AP | Slightly stale recs OK vs no video playback |
+| **Uber payment processing** | CP | Payment integrity over availability |
+| **Twitter timeline** | AP | Old tweets showing briefly OK vs Twitter down |
+
+### PACELC - Beyond CAP
+
+**More realistic**:
+- **P**artition → choose **A**vailability or **C**onsistency
+- **E**lse (no partition) → choose **L**atency or **C**onsistency
+
+**Examples**:
+- **Cassandra**: PA/EL (availability + low latency)
+- **MongoDB**: PC/EC (consistency always, even at cost of latency)
+- **DynamoDB**: PA/EL (can be tuned to PC/EC with quorum)
+
+---
+
+## 🏗️ Monolith vs Microservices Decision
+
+> **Don't just say "microservices are better"** - That's a red flag! There's nuance.
+
+### Decision Matrix
+
+| Factor | Monolith | Microservices |
+|--------|----------|---------------|
+| **Team size** | <10 engineers | 10+ engineers |
+| **Deployment frequency** | Weekly/Monthly | Daily/Hourly |
+| **System complexity** | Simple CRUD | Complex domains |
+| **Scale requirements** | <10K RPS | >100K RPS |
+| **Tech diversity** | Single stack preferred | Polyglot needed |
+| **Development speed** | Faster (initially) | Slower (initially), faster (long-term) |
+
+### When Monolith is Better
+
+**Startups, MVPs, Small Teams:**
+```
+✅ Faster to market (no service boundaries to design)
+✅ Easier debugging (single codebase, stack trace)
+✅ Simpler deployment (one binary, one database)
+✅ Lower operational complexity (no service mesh, discovery)
+✅ Easier testing (no network calls to mock)
+```
+
+**Example**: **Instagram** was a monolith until 100M+ users!
+
+### When Microservices Make Sense
+
+**Large teams, high scale:**
+```
+✅ Independent scaling (auth service different load than video processing)
+✅ Independent deployment (ship features without full system release)
+✅ Team autonomy (each team owns a service)
+✅ Fault isolation (payment service down ≠ whole site down)
+✅ Technology flexibility (Python for ML, Go for performance)
+```
+
+**Example**: **Netflix** - 700+ microservices, billions of requests/day
+
+### The Migration Path (Strangler Fig Pattern)
+
+**Don't rewrite everything overnight!**
+
+```
+Step 1: Identify bounded contexts
+   Example: User Auth, Payment, Inventory, Recommendations
+
+Step 2: Extract one service at a time (high value first)
+   Start with: Authentication (used everywhere, security-critical)
+
+Step 3: API Gateway pattern
+   [Client] → [API Gateway] → [Monolith + New Service]
+   Gateway routes /auth/* to new service, rest to monolith
+
+Step 4: Gradually move more services out
+   Takes 1-3 years for large companies!
+
+Step 5: Eventually decommission monolith
+   Or keep it! Monolith for core CRUD, services for special needs.
+```
+
+### Microservices Challenges (Mention These!)
+
+**1. Distributed System Complexity**:
+- Network calls can fail (retry logic, circuit breakers)
+- Distributed tracing needed (Zipkin, Jaeger)
+- Service discovery (Consul, etcd)
+
+**2. Data Consistency**:
+- No ACID across services
+- Need Saga pattern or event sourcing
+- Eventual consistency trade-offs
+
+**3. Operational Overhead**:
+- Deploy 50 services vs 1 binary
+- Monitor 50 services (Prometheus, Grafana)
+- Debug cross-service issues
+
+**4. Testing Complexity**:
+- Integration tests require multiple services running
+- Contract testing (Pact) needed
+- End-to-end tests brittle
+
+### Hybrid Approach (Best of Both)
+
+**"Monolith-first, extract services later"**:
+```
+- Start with modular monolith (clean boundaries WITHIN codebase)
+- Use interfaces/modules to separate concerns
+- When a module needs independent scaling → extract to service
+- Keep most code in monolith, extract ~5-10 critical services
+```
+
+**Example**: **Shopify** - Monolithic Rails app + specialized services (payment, shipping)
+
+---
+
+## 🔐 Auth at Scale (Interviewers LOVE This Topic)
+
+### Authentication vs Authorization
+
+| Authentication | Authorization |
+|----------------|---------------|
+| **Who are you?** | **What can you do?** |
+| Login with password | Check if user can access resource |
+| Returns user identity | Returns permissions |
+| Happens once (login) | Happens every request |
+
+### Session-Based Auth (Traditional)
+
+```
+1. User logs in with username/password
+2. Server creates session, stores in Redis/database
+3. Server returns session_id in cookie
+4. Subsequent requests include cookie
+5. Server looks up session_id to get user info
+```
+
+**Pros**: Can revoke sessions immediately (logout)
+**Cons**: Server-side storage, not scalable across microservices
+
+### Token-Based Auth (JWT - Modern Standard)
+
+```
+1. User logs in
+2. Server generates JWT (signed token containing user_id, role, expiry)
+3. Client stores JWT (localStorage or cookie)
+4. Client sends JWT in Authorization header: "Bearer <token>"
+5. Server validates signature (no database lookup needed!)
+```
+
+**JWT Structure**:
+```
+header.payload.signature
+eyJhbGc...  .  eyJ1c2VyX2lkIjo...  .  SflKxwRJSMeKKF2QT...
+(Base64)      (Base64 user data)      (HMAC signature)
+```
+
+**Pros**: Stateless (no server-side storage), scales horizontally
+**Cons**: Can't revoke (until expiry), token size (200-1000 bytes)
+
+### OAuth 2.0 (Third-Party Login)
+
+**"Login with Google/Facebook/GitHub"**:
+```
+1. User clicks "Login with Google"
+2. Redirect to Google's auth page
+3. User authorizes your app
+4. Google redirects back with authorization_code
+5. Your server exchanges code for access_token
+6. Use access_token to fetch user profile from Google API
+7. Create session/JWT for user in YOUR system
+```
+
+**Why use OAuth?**:
+- Don't store passwords (security)
+- Leverage existing accounts (reduce friction)
+- Access user data from provider (email, profile pic)
+
+### API Keys for Service-to-Service
+
+```
+Example: Mobile app → Your API → Stripe API
+
+Your API key for Stripe:
+- Long-lived token (doesn't expire)
+- Stored as environment variable
+- Rotated quarterly
+- Never exposed to client
+```
+
+### Role-Based Access Control (RBAC)
+
+```python
+# Simple RBAC example
+roles = {
+  "admin": ["read", "write", "delete", "manage_users"],
+  "editor": ["read", "write"],
+  "viewer": ["read"]
+}
+
+def check_permission(user, action, resource):
+  user_permissions = roles[user.role]
+  return action in user_permissions
+```
+
+**Interview tip**: Mention RBAC vs ABAC (Attribute-Based) for complex permissions.
+
+### Scaling Auth
+
+**Problem**: Auth service becomes bottleneck (every request hits it)
+
+**Solution 1: JWT** (no auth service call needed)
+```
+API Gateway validates JWT signature → forwards to backend
+```
+
+**Solution 2: Cache user permissions in Redis**
+```
+Cache key: "user:123:permissions" → ["read", "write"]
+TTL: 5 minutes
+```
+
+**Solution 3: Service mesh (Istio) with mTLS**
+```
+Services communicate with mutual TLS certificates
+No per-request auth check needed
+```
+
+---
+
+## 📊 Monitoring & Observability (Often Overlooked!)
+
+### The Three Pillars
+
+**1. Metrics** (What's happening?):
+```
+- Request rate (QPS)
+- Error rate (5xx errors)
+- Latency (p50, p95, p99)
+- Resource usage (CPU, memory, disk)
+
+Tools: Prometheus, Grafana, Datadog
+```
+
+**2. Logs** (Why did it happen?):
+```
+- Structured logs (JSON format)
+- Include: timestamp, request_id, user_id, error message
+- Centralized logging (ELK stack, Loki)
+
+Example:
+{
+  "timestamp": "2025-11-10T10:30:00Z",
+  "level": "ERROR",
+  "request_id": "abc-123",
+  "user_id": 456,
+  "message": "Database connection timeout",
+  "query": "SELECT * FROM users WHERE id=456"
+}
+```
+
+**3. Traces** (Where's the bottleneck?):
+```
+- Track request through multiple services
+- Shows: which service, how long, dependencies
+
+Example trace:
+API Gateway (10ms) → Auth Service (50ms) → User Service (200ms) → Database (180ms)
+Total: 260ms (database is the bottleneck!)
+
+Tools: Jaeger, Zipkin, OpenTelemetry
+```
+
+### Key Metrics to Monitor
+
+```
+Golden Signals (Google SRE):
+1. Latency: How long requests take
+2. Traffic: How many requests
+3. Errors: Rate of failed requests  
+4. Saturation: How "full" is the system (CPU, memory)
+
+RED Metrics (for services):
+1. Rate: Requests per second
+2. Errors: Error rate
+3. Duration: Latency distribution
+
+USE Metrics (for resources):
+1. Utilization: % time resource is busy
+2. Saturation: Queue depth
+3. Errors: Error count
+```
+
+### Alert Thresholds (Don't Alert on Everything!)
+
+```
+❌ Bad: Alert on p50 latency > 100ms
+   (Too noisy, p50 fluctuates normally)
+
+✅ Good: Alert on p99 latency > 1000ms for 5 minutes
+   (Real user impact, not transient spikes)
+
+❌ Bad: Alert on any error
+   (Errors happen, some are expected)
+
+✅ Good: Alert on error rate > 1% for 10 minutes
+   (Significant degradation, not isolated incidents)
+```
+
+### Interview Answer Template
+
+**When asked "How would you monitor this system?"**:
+
+```
+1. Metrics (Prometheus + Grafana):
+   - QPS dashboard (reads vs writes)
+   - Error rate (5xx errors, timeouts)
+   - Latency (p50, p95, p99)
+   - Resource usage (CPU, memory per pod)
+
+2. Logs (ELK stack):
+   - Structured JSON logs
+   - Include request_id for tracing
+   - Centralized (all services → Elasticsearch)
+   - Retention: 30 days
+
+3. Traces (Jaeger):
+   - Track requests across microservices
+   - Identify slow dependencies
+   - Correlation with request_id
+
+4. Alerts (PagerDuty):
+   - p99 latency > 1s for 5 min
+   - Error rate > 1% for 10 min
+   - CPU > 80% for 15 min
+   - Database connection pool exhaustion
+
+5. Dashboards:
+   - Real-time: Current QPS, errors, latency
+   - Historical: Trends over 7/30 days
+   - Per-service: Drill down into specific component
+```
+
+---
+
+## 🎤 Common Interview Questions & Frameworks
+
+### Q1: "Design a URL Shortener"
+
+**Framework**: RADIO method (Requirements → API → Data → Infrastructure → Optimizations)
+
+**Time**: 45 minutes total
+- Requirements (5 min): Functional (shorten, redirect), Non-functional (low latency, scalable)
+- API (5 min): POST /shorten, GET /{code}
+- Data Model (10 min): urls table, short_code index
+- Infrastructure (15 min): LB → App servers → Redis → MySQL
+- Optimizations (10 min): Base62 encoding, cache strategy, analytics
+
+**Gotchas to mention**:
+- Short code collision handling
+- Expired URL cleanup
+- Custom short codes (unique constraint)
+- Rate limiting (prevent abuse)
+
+### Q2: "Design Instagram"
+
+**Key features**: Upload photos, follow users, newsfeed, likes/comments
+
+**Critical decisions**:
+- Blob storage for images (S3, GCS)
+- Hybrid fan-out (push for regular users, pull for celebrities)
+- CDN for image delivery
+- Database sharding (by user_id)
+- Cache hot feed content (Redis)
+
+**Scale numbers**:
+- 1B users, 500M DAU
+- 100M photos uploaded/day
+- Each photo: 2MB × 3 sizes = 6MB
+- Storage: 600M × 6MB = 3.6PB/day (need S3 deep archive!)
+
+### Q3: "Design a Rate Limiter"
+
+**Algorithms**: Token bucket, leaky bucket, fixed/sliding window
+
+**Implementation options**:
+- API Gateway (centralized)
+- Redis (distributed counter)
+- In-memory (per-server, approximate)
+
+**Key decisions**:
+- Rate limit scope (per-user vs per-IP vs per-API-key)
+- Time window (per second, minute, hour)
+- Exceeded response (429 status, Retry-After header)
+- Distributed coordination (Redis vs local)
+
+### Q4: "Design a Chat System (WhatsApp/Slack)"
+
+**Core features**: 1-to-1 messaging, group chat, online status, read receipts
+
+**Architecture**:
+- WebSocket servers (persistent connections)
+- Message queue (Kafka for delivery)
+- Cassandra (message storage, user_id + timestamp clustering)
+- Redis (online status, pub/sub for real-time)
+
+**Challenges**:
+- Message ordering (use sequence numbers)
+- Offline message delivery (queue until user online)
+- Group chat (fan-out to N users)
+- End-to-end encryption (Signal Protocol)
+
+### Q5: "Design a Notification System"
+
+**Channels**: Push notifications, SMS, email, in-app
+
+**Components**:
+- Event producers (user actions trigger notifications)
+- Notification service (formats messages per channel)
+- Third-party APIs (FCM for push, Twilio for SMS, SendGrid for email)
+- Retry logic (exponential backoff)
+
+**Optimizations**:
+- Batching (combine multiple notifications)
+- User preferences (opt-out, quiet hours)
+- Rate limiting (don't spam users)
+- Priority queue (urgent vs regular)
+
+---
+
+## 🧠 Mental Models & Heuristics
+
+### "How big should my cache be?"
+
+**Rule of thumb**: Cache 20% of your data (covers 80% of requests)
+```
+If daily requests = 1B
+And unique data items = 100M
+Cache size = 100M × 20% = 20M items
+Assuming 1KB per item = 20GB
+
+Practical: 64GB RAM can cache 64M items (more than enough!)
+```
+
+### "Do I need a message queue?"
+
+**Yes, if**:
+- Async processing (email sending, video encoding)
+- Decoupling services (producer/consumer independent)
+- Traffic spikes (queue smooths load)
+- Retries needed (failed jobs requeued)
+
+**No, if**:
+- Synchronous response required (user waiting)
+- Simple request-response (REST API)
+- Low volume (<100 requests/min)
+
+### "When to shard my database?"
+
+**Shard when**:
+- Single database > 1TB (hard to backup/restore)
+- QPS > 10K (single DB bottleneck)
+- Hot partitions (some users generate 10x traffic)
+
+**Before sharding, try**:
+- Read replicas (scale reads)
+- Caching (reduce DB hits by 80%+)
+- Vertical scaling (bigger machine)
+- Indexes (slow queries often just need indexes)
+
+### "SQL or NoSQL?"
+
+**Quick decision tree**:
+```
+Do you need ACID transactions? (bank transfers, inventory)
+  └─ Yes → SQL (PostgreSQL)
+  └─ No  → Continue
+
+Do you need complex joins? (many-to-many relationships)
+  └─ Yes → SQL
+  └─ No  → Continue
+
+Is your data highly structured? (fixed schema)
+  └─ Yes → SQL
+  └─ No  → Continue
+
+Do you need >100K QPS or >10TB data?
+  └─ Yes → NoSQL (Cassandra, DynamoDB)
+  └─ No  → SQL is fine!
+
+Default: Start with PostgreSQL, migrate to NoSQL when needed.
+```
+
+---
+
+## 🚨 Red Flags to Avoid
+
+**These responses will hurt you**:
+
+❌ "We'll use microservices because they're modern"
+   ✅ "We'll start with a monolith for speed, extract services as scale demands"
+
+❌ "NoSQL is faster than SQL"
+   ✅ "NoSQL trades consistency for horizontal scalability; SQL is fine until 100K+ QPS"
+
+❌ "We'll use Kubernetes"
+   ✅ "For 10K users, Heroku/EC2 is simpler. Kubernetes adds value at 100K+ RPS"
+
+❌ "Blockchain for data integrity"
+   ✅ "Merkle trees provide integrity without blockchain overhead"
+
+❌ "Machine learning will recommend content"
+   ✅ "Start with collaborative filtering (simpler), add ML when data >1M users"
+
+❌ "I'll add caching everywhere"
+   ✅ "Cache hot data (80/20 rule), measure hit ratio, avoid premature caching"
+
+❌ "MongoDB because it's flexible"
+   ✅ "MongoDB if schema changes frequently AND don't need ACID. PostgreSQL JSONB is a hybrid option."
+
+---
+
+## 🎯 Final Checklist for Interviews
+
+**Before you finish your design, verify**:
+
+☑️ **Stated assumptions clearly** (DAU, read/write ratio, storage per user)
+☑️ **Calculated rough numbers** (QPS, storage, bandwidth)
+☑️ **Defined APIs** (endpoints, request/response format)
+☑️ **Chose appropriate database(s)** (SQL vs NoSQL with reasoning)
+☑️ **Included caching layer** (what to cache, eviction policy)
+☑️ **Discussed scaling strategy** (horizontal scaling, sharding, replication)
+☑️ **Mentioned monitoring** (metrics, logs, alerts)
+☑️ **Identified bottlenecks** (database, network, CPU, memory)
+☑️ **Proposed optimizations** (CDN, load balancing, async processing)
+☑️ **Acknowledged trade-offs** (consistency vs availability, cost vs performance)
+
+---
+
+**End of SDE-II Interview Essentials** 🎓
+
+---
+
+# 💻 Code-Level System Design Patterns
+
+> **Interviewers often ask: "How would you implement this?"** - Show you can code, not just draw boxes.
+
+## Circuit Breaker Pattern
+
+**Problem**: Calling a failing service repeatedly wastes resources and delays responses.
+
+**Solution**: Detect failures, "open" the circuit, fail fast until service recovers.
+
+```python
+import time
+from enum import Enum
+
+class CircuitState(Enum):
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"      # Failing, reject requests
+    HALF_OPEN = "half_open"  # Testing recovery
+
+class CircuitBreaker:
+    def __init__(self, failure_threshold=5, timeout=60, success_threshold=2):
+        self.failure_threshold = failure_threshold  # Open after N failures
+        self.timeout = timeout  # Seconds to wait before trying again
+        self.success_threshold = success_threshold  # Close after N successes
+        
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_failure_time = None
+        self.state = CircuitState.CLOSED
+    
+    def call(self, func, *args, **kwargs):
+        """Execute function through circuit breaker"""
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure_time > self.timeout:
+                # Try again after timeout
+                self.state = CircuitState.HALF_OPEN
+                self.success_count = 0
+            else:
+                raise Exception("Circuit breaker is OPEN - failing fast")
+        
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+    
+    def _on_success(self):
+        self.failure_count = 0
+        if self.state == CircuitState.HALF_OPEN:
+            self.success_count += 1
+            if self.success_count >= self.success_threshold:
+                self.state = CircuitState.CLOSED  # Service recovered!
+    
+    def _on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN  # Too many failures, open circuit
+
+# Usage example
+import requests
+
+payment_circuit = CircuitBreaker(failure_threshold=3, timeout=30)
+
+def charge_customer(customer_id, amount):
+    """This might fail if payment service is down"""
+    response = requests.post(
+        "https://payment-api.com/charge",
+        json={"customer_id": customer_id, "amount": amount}
+    )
+    response.raise_for_status()  # Raises exception on 4xx/5xx
+    return response.json()
+
+# Protected call
+try:
+    result = payment_circuit.call(charge_customer, customer_id=123, amount=99.99)
+    print(f"Payment successful: {result}")
+except Exception as e:
+    print(f"Payment failed (circuit breaker): {e}")
+    # Return cached response, show error to user, or use fallback
+```
+
+**Interview talking points**:
+- State transitions: CLOSED → OPEN (failures) → HALF_OPEN (timeout) → CLOSED (recovery)
+- Prevents cascading failures (one service down doesn't bring down others)
+- Used by Netflix Hystrix, Resilience4j, AWS service clients
+
+---
+
+## Rate Limiter (Token Bucket Implementation)
+
+```python
+import time
+import threading
+
+class TokenBucket:
+    def __init__(self, capacity, refill_rate):
+        """
+        capacity: Maximum number of tokens (burst size)
+        refill_rate: Tokens added per second
+        """
+        self.capacity = capacity
+        self.refill_rate = refill_rate
+        self.tokens = capacity
+        self.last_refill = time.time()
+        self.lock = threading.Lock()
+    
+    def _refill(self):
+        """Add tokens based on time elapsed"""
+        now = time.time()
+        elapsed = now - self.last_refill
+        tokens_to_add = elapsed * self.refill_rate
+        self.tokens = min(self.capacity, self.tokens + tokens_to_add)
+        self.last_refill = now
+    
+    def consume(self, tokens=1):
+        """Try to consume tokens; return True if allowed, False if rate limited"""
+        with self.lock:
+            self._refill()
+            if self.tokens >= tokens:
+                self.tokens -= tokens
+                return True
+            return False
+
+# Distributed version with Redis
+import redis
+
+class DistributedTokenBucket:
+    def __init__(self, redis_client, key, capacity, refill_rate):
+        self.redis = redis_client
+        self.key = key
+        self.capacity = capacity
+        self.refill_rate = refill_rate
+    
+    def consume(self, tokens=1):
+        """Lua script ensures atomic operation in Redis"""
+        lua_script = """
+        local key = KEYS[1]
+        local capacity = tonumber(ARGV[1])
+        local refill_rate = tonumber(ARGV[2])
+        local tokens_requested = tonumber(ARGV[3])
+        local now = tonumber(ARGV[4])
+        
+        -- Get current state
+        local bucket = redis.call('HMGET', key, 'tokens', 'last_refill')
+        local tokens = tonumber(bucket[1]) or capacity
+        local last_refill = tonumber(bucket[2]) or now
+        
+        -- Refill tokens
+        local elapsed = now - last_refill
+        tokens = math.min(capacity, tokens + (elapsed * refill_rate))
+        
+        -- Try to consume
+        if tokens >= tokens_requested then
+            tokens = tokens - tokens_requested
+            redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
+            redis.call('EXPIRE', key, 3600)  -- Auto-cleanup after 1 hour
+            return 1  -- Allowed
+        else
+            return 0  -- Rate limited
+        end
+        """
+        
+        result = self.redis.eval(
+            lua_script,
+            1,  # Number of keys
+            self.key,
+            self.capacity,
+            self.refill_rate,
+            tokens,
+            time.time()
+        )
+        return result == 1
+
+# Usage example
+r = redis.Redis(host='localhost', port=6379)
+limiter = DistributedTokenBucket(
+    redis_client=r,
+    key="user:123:api_calls",
+    capacity=100,  # Burst up to 100 requests
+    refill_rate=10  # 10 requests per second sustained
+)
+
+def api_call(user_id):
+    if not limiter.consume(tokens=1):
+        return {"error": "Rate limit exceeded", "status": 429}
+    # Process request...
+    return {"data": "success"}
+```
+
+**Interview talking points**:
+- Allows bursts (good for APIs with occasional spikes)
+- Distributed version uses Redis + Lua for atomic operations
+- Alternative: Sliding window (more accurate but more complex)
+
+---
+
+## Consistent Hashing with Virtual Nodes
+
+```python
+import hashlib
+from bisect import bisect_right
+
+class ConsistentHashRing:
+    def __init__(self, num_virtual_nodes=150):
+        self.num_virtual_nodes = num_virtual_nodes
+        self.ring = {}  # hash -> node_id
+        self.sorted_keys = []  # Sorted list of hashes for binary search
+    
+    def _hash(self, key):
+        """Hash function (MD5 for simplicity; use xxHash in production)"""
+        return int(hashlib.md5(key.encode()).hexdigest(), 16)
+    
+    def add_node(self, node_id):
+        """Add a physical node with virtual nodes"""
+        for i in range(self.num_virtual_nodes):
+            virtual_key = f"{node_id}:{i}"
+            hash_value = self._hash(virtual_key)
+            self.ring[hash_value] = node_id
+        
+        self.sorted_keys = sorted(self.ring.keys())
+        print(f"Added node {node_id} with {self.num_virtual_nodes} virtual nodes")
+    
+    def remove_node(self, node_id):
+        """Remove a physical node"""
+        for i in range(self.num_virtual_nodes):
+            virtual_key = f"{node_id}:{i}"
+            hash_value = self._hash(virtual_key)
+            del self.ring[hash_value]
+        
+        self.sorted_keys = sorted(self.ring.keys())
+        print(f"Removed node {node_id}")
+    
+    def get_node(self, key):
+        """Find which node this key belongs to"""
+        if not self.ring:
+            return None
+        
+        hash_value = self._hash(key)
+        
+        # Binary search for the next node clockwise on the ring
+        idx = bisect_right(self.sorted_keys, hash_value)
+        
+        # Wrap around if we're past the end
+        if idx == len(self.sorted_keys):
+            idx = 0
+        
+        return self.ring[self.sorted_keys[idx]]
+
+# Usage example
+hash_ring = ConsistentHashRing(num_virtual_nodes=150)
+
+# Add servers
+hash_ring.add_node("server1")
+hash_ring.add_node("server2")
+hash_ring.add_node("server3")
+
+# Route requests
+keys = ["user:1234", "user:5678", "session:abc123", "cache:xyz"]
+for key in keys:
+    node = hash_ring.get_node(key)
+    print(f"{key} → {node}")
+
+# Simulate server failure
+print("\nServer2 failed, removing...")
+hash_ring.remove_node("server2")
+
+print("\nAfter removal:")
+for key in keys:
+    node = hash_ring.get_node(key)
+    print(f"{key} → {node}")
+
+# Output shows minimal key remapping!
+```
+
+**Interview talking points**:
+- Virtual nodes solve uneven load distribution
+- Adding/removing nodes only affects neighbors (not all keys)
+- Used in Cassandra, DynamoDB, Redis Cluster
+
+---
+
+## LRU Cache (Interview Classic!)
+
+```python
+class Node:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+        self.prev = None
+        self.next = None
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.cache = {}  # key -> Node
+        
+        # Doubly linked list with dummy head/tail
+        self.head = Node(0, 0)  # Most recently used
+        self.tail = Node(0, 0)  # Least recently used
+        self.head.next = self.tail
+        self.tail.prev = self.head
+    
+    def _remove(self, node):
+        """Remove node from linked list"""
+        prev_node = node.prev
+        next_node = node.next
+        prev_node.next = next_node
+        next_node.prev = prev_node
+    
+    def _add_to_head(self, node):
+        """Add node right after head (most recently used)"""
+        node.next = self.head.next
+        node.prev = self.head
+        self.head.next.prev = node
+        self.head.next = node
+    
+    def get(self, key):
+        """Get value and mark as recently used"""
+        if key in self.cache:
+            node = self.cache[key]
+            self._remove(node)
+            self._add_to_head(node)
+            return node.value
+        return -1  # Cache miss
+    
+    def put(self, key, value):
+        """Add/update value"""
+        if key in self.cache:
+            # Update existing
+            node = self.cache[key]
+            node.value = value
+            self._remove(node)
+            self._add_to_head(node)
+        else:
+            # Add new
+            if len(self.cache) >= self.capacity:
+                # Evict LRU (tail.prev)
+                lru_node = self.tail.prev
+                self._remove(lru_node)
+                del self.cache[lru_node.key]
+            
+            new_node = Node(key, value)
+            self.cache[key] = new_node
+            self._add_to_head(new_node)
+
+# Usage
+cache = LRUCache(capacity=3)
+cache.put(1, "A")
+cache.put(2, "B")
+cache.put(3, "C")
+print(cache.get(1))  # "A" (1 is now most recent)
+cache.put(4, "D")  # Evicts key 2 (LRU)
+print(cache.get(2))  # -1 (cache miss)
+```
+
+**Interview talking points**:
+- O(1) get and put operations (hash map + doubly linked list)
+- Evicts least recently used when capacity reached
+- Production versions add TTL, write-through/write-behind policies
+
+---
+
+## Bloom Filter (Space-Efficient Set Membership)
+
+```python
+import mmh3  # MurmurHash3 (fast, non-cryptographic)
+from bitarray import bitarray
+
+class BloomFilter:
+    def __init__(self, size, num_hash_functions):
+        """
+        size: Number of bits in the filter
+        num_hash_functions: Number of hash functions (k)
+        
+        Rule of thumb: 
+        - m (size) = -n * ln(p) / (ln(2)^2)
+        - k (num_hash_functions) = (m/n) * ln(2)
+        where n = expected items, p = false positive rate
+        
+        Example: 1M items, 1% false positive rate
+        - m ≈ 9,585,059 bits (1.14 MB)
+        - k ≈ 7 hash functions
+        """
+        self.size = size
+        self.num_hash_functions = num_hash_functions
+        self.bit_array = bitarray(size)
+        self.bit_array.setall(0)
+    
+    def add(self, item):
+        """Add item to the filter"""
+        for i in range(self.num_hash_functions):
+            # Generate multiple hash values from a single hash function
+            hash_value = mmh3.hash(item, i) % self.size
+            self.bit_array[hash_value] = 1
+    
+    def contains(self, item):
+        """Check if item *might* be in the set"""
+        for i in range(self.num_hash_functions):
+            hash_value = mmh3.hash(item, i) % self.size
+            if self.bit_array[hash_value] == 0:
+                return False  # Definitely NOT in set
+        return True  # Probably in set (might be false positive)
+
+# Usage example: Checking if username is taken
+usernames_bf = BloomFilter(size=10_000_000, num_hash_functions=7)
+
+# Add existing usernames
+existing_users = ["alice", "bob", "charlie", "david"]
+for user in existing_users:
+    usernames_bf.add(user)
+
+# Check availability (fast pre-check before database query)
+def is_username_taken(username):
+    if usernames_bf.contains(username):
+        # Might be taken, check database to confirm
+        # return db.query("SELECT 1 FROM users WHERE username = ?", username)
+        return "Possibly taken (check DB)"
+    else:
+        # Definitely available (skip DB query!)
+        return "Available!"
+
+print(is_username_taken("alice"))  # "Possibly taken"
+print(is_username_taken("zebra"))  # "Available!" (skips DB!)
+
+# False positive example (rare, ~1% with our settings)
+print(is_username_taken("xyz123"))  # Might say "Possibly taken" even if not in DB
+```
+
+**Interview talking points**:
+- **Space-efficient**: 1M items in ~1MB (vs 1M × 50 bytes = 50MB in hash set)
+- **No false negatives**: If it says "not present," it's definitely not present
+- **Has false positives**: ~1% with typical settings (tunable)
+- **Use cases**: 
+  - Weak password check (is password in breached password list?)
+  - Crawler deduplication (have we seen this URL?)
+  - Database query optimization (skip query if key definitely doesn't exist)
+
+---
+
+## Retry with Exponential Backoff
+
+```python
+import time
+import random
+
+def exponential_backoff_retry(func, max_retries=5, base_delay=1, max_delay=60, jitter=True):
+    """
+    Retry function with exponential backoff
+    
+    Delays: 1s, 2s, 4s, 8s, 16s, ... (capped at max_delay)
+    Jitter: Adds randomness to avoid thundering herd
+    """
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                # Last attempt failed, give up
+                raise e
+            
+            # Calculate delay: 2^attempt * base_delay
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            
+            # Add jitter (random ±25%)
+            if jitter:
+                delay *= (0.75 + 0.5 * random.random())
+            
+            print(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay:.2f}s...")
+            time.sleep(delay)
+
+# Usage example
+import requests
+
+def fetch_user_data(user_id):
+    response = requests.get(f"https://api.example.com/users/{user_id}", timeout=5)
+    response.raise_for_status()  # Raises exception on 4xx/5xx
+    return response.json()
+
+try:
+    user_data = exponential_backoff_retry(
+        lambda: fetch_user_data(user_id=123),
+        max_retries=5,
+        base_delay=1,
+        max_delay=30
+    )
+    print(f"User data: {user_data}")
+except Exception as e:
+    print(f"Failed after retries: {e}")
+    # Fall back to cached data or show error to user
+```
+
+**Interview talking points**:
+- Exponential backoff prevents overwhelming failing service
+- Jitter prevents "thundering herd" (many clients retrying simultaneously)
+- Use for: API calls, database connections, message queue consumers
+- Don't retry: 4xx errors (client errors), user-initiated cancellations
+
+---
+
+## Idempotency Key Pattern (Prevent Duplicate Payments!)
+
+```python
+import uuid
+import redis
+
+class IdempotentPaymentProcessor:
+    def __init__(self, redis_client):
+        self.redis = redis_client
+        self.ttl = 86400  # 24 hours
+    
+    def process_payment(self, idempotency_key, customer_id, amount):
+        """
+        Process payment with idempotency guarantee
+        If same idempotency_key sent twice, return cached result
+        """
+        # Check if we've already processed this request
+        cached_result = self.redis.get(f"payment:{idempotency_key}")
+        if cached_result:
+            print(f"Idempotent request detected, returning cached result")
+            return eval(cached_result)  # In production, use JSON
+        
+        # Process payment (this should only happen once!)
+        try:
+            result = self._charge_customer(customer_id, amount)
+            
+            # Cache result for 24 hours
+            self.redis.setex(
+                f"payment:{idempotency_key}",
+                self.ttl,
+                str(result)
+            )
+            
+            return result
+        except Exception as e:
+            # Don't cache failures (allow retry)
+            raise e
+    
+    def _charge_customer(self, customer_id, amount):
+        """Actual payment processing (hits Stripe API, etc.)"""
+        print(f"Charging customer {customer_id} ${amount}...")
+        # Simulate payment processing
+        time.sleep(1)
+        return {
+            "payment_id": str(uuid.uuid4()),
+            "customer_id": customer_id,
+            "amount": amount,
+            "status": "success"
+        }
+
+# Usage example
+r = redis.Redis(host='localhost', port=6379)
+payment_processor = IdempotentPaymentProcessor(r)
+
+# Client generates idempotency key (usually UUID)
+idempotency_key = str(uuid.uuid4())
+
+# First request: processes payment
+result1 = payment_processor.process_payment(
+    idempotency_key=idempotency_key,
+    customer_id=123,
+    amount=99.99
+)
+print(f"First request: {result1}")
+
+# Duplicate request (network retry, user double-click): returns cached result
+result2 = payment_processor.process_payment(
+    idempotency_key=idempotency_key,  # Same key!
+    customer_id=123,
+    amount=99.99
+)
+print(f"Duplicate request: {result2}")
+
+# Same payment_id proves no double-charge!
+assert result1["payment_id"] == result2["payment_id"]
+```
+
+**Interview talking points**:
+- Critical for payments (prevent double-charging)
+- Client generates UUID, sends with request
+- Server caches result by idempotency key
+- TTL should be longer than retry window (24 hours typical)
+- Used by Stripe, PayPal, all payment APIs
+
+---
+
+## Database Connection Pooling
+
+```python
+import psycopg2
+from psycopg2 import pool
+import threading
+
+class DatabasePool:
+    def __init__(self, minconn=5, maxconn=20):
+        """
+        minconn: Minimum number of connections to keep open
+        maxconn: Maximum number of connections allowed
+        """
+        self.pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=minconn,
+            maxconn=maxconn,
+            host="localhost",
+            database="myapp",
+            user="postgres",
+            password="password"
+        )
+    
+    def execute_query(self, query, params=None):
+        """Get connection from pool, execute query, return connection"""
+        conn = None
+        try:
+            # Get connection from pool (blocks if all connections in use)
+            conn = self.pool.getconn()
+            
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                if cursor.description:  # SELECT query
+                    result = cursor.fetchall()
+                    return result
+                else:  # INSERT/UPDATE/DELETE
+                    conn.commit()
+                    return cursor.rowcount
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if conn:
+                # Return connection to pool (doesn't close it!)
+                self.pool.putconn(conn)
+    
+    def close_all(self):
+        """Close all connections (call on app shutdown)"""
+        self.pool.closeall()
+
+# Usage example
+db = DatabasePool(minconn=5, maxconn=20)
+
+def fetch_user(user_id):
+    result = db.execute_query(
+        "SELECT id, name, email FROM users WHERE id = %s",
+        (user_id,)
+    )
+    return result[0] if result else None
+
+# Simulate concurrent requests (connection pool reuses connections)
+def simulate_request(request_id):
+    user = fetch_user(user_id=123)
+    print(f"Request {request_id}: {user}")
+
+threads = [threading.Thread(target=simulate_request, args=(i,)) for i in range(50)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# Without pool: 50 new connections (slow!)
+# With pool: Reuse 20 connections (fast!)
+
+db.close_all()
+```
+
+**Interview talking points**:
+- Creating new DB connections is slow (100-500ms)
+- Pool maintains warm connections (reuse instead of recreate)
+- Max connections prevents overwhelming database
+- Default sizes: minconn=5-10, maxconn=20-50 (depends on load)
+
+---
+
+## Distributed Lock (Prevent Race Conditions)
+
+```python
+import redis
+import time
+import uuid
+
+class RedisDistributedLock:
+    def __init__(self, redis_client, lock_key, timeout=10):
+        self.redis = redis_client
+        self.lock_key = lock_key
+        self.timeout = timeout
+        self.lock_value = str(uuid.uuid4())  # Unique ID for this lock holder
+    
+    def acquire(self, blocking=True, timeout=30):
+        """
+        Try to acquire lock
+        blocking: If True, wait until lock available
+        timeout: Max time to wait (seconds)
+        """
+        start_time = time.time()
+        
+        while True:
+            # SET key value NX EX timeout
+            # NX: Only set if key doesn't exist
+            # EX: Set expiry (prevent deadlock if holder crashes)
+            acquired = self.redis.set(
+                self.lock_key,
+                self.lock_value,
+                nx=True,  # Only set if not exists
+                ex=self.timeout  # Auto-expire after timeout
+            )
+            
+            if acquired:
+                return True
+            
+            if not blocking:
+                return False
+            
+            if time.time() - start_time > timeout:
+                return False  # Timeout waiting for lock
+            
+            time.sleep(0.1)  # Wait before retrying
+    
+    def release(self):
+        """Release lock (only if we own it)"""
+        # Lua script for atomic check-and-delete
+        lua_script = """
+        if redis.call("GET", KEYS[1]) == ARGV[1] then
+            return redis.call("DEL", KEYS[1])
+        else
+            return 0
+        end
+        """
+        
+        released = self.redis.eval(lua_script, 1, self.lock_key, self.lock_value)
+        return released == 1
+    
+    def __enter__(self):
+        """Context manager support: with lock:"""
+        self.acquire()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+
+# Usage example: Prevent double-booking
+r = redis.Redis(host='localhost', port=6379)
+
+def book_seat(event_id, seat_id, user_id):
+    """Book a seat for an event (must prevent double-booking!)"""
+    lock_key = f"lock:event:{event_id}:seat:{seat_id}"
+    
+    with RedisDistributedLock(r, lock_key, timeout=5):
+        # Critical section: only one process can execute this at a time
+        
+        # Check if seat already booked
+        existing_booking = db_query(
+            "SELECT user_id FROM bookings WHERE event_id = ? AND seat_id = ?",
+            (event_id, seat_id)
+        )
+        
+        if existing_booking:
+            return {"error": "Seat already booked"}
+        
+        # Book the seat
+        db_execute(
+            "INSERT INTO bookings (event_id, seat_id, user_id) VALUES (?, ?, ?)",
+            (event_id, seat_id, user_id)
+        )
+        
+        return {"success": True, "message": f"Seat {seat_id} booked!"}
+
+# Concurrent requests for same seat
+import threading
+
+def try_book(user_id):
+    result = book_seat(event_id=1, seat_id=42, user_id=user_id)
+    print(f"User {user_id}: {result}")
+
+# Only ONE user will successfully book seat 42!
+threads = [threading.Thread(target=try_book, args=(i,)) for i in range(10)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+```
+
+**Interview talking points**:
+- Prevents race conditions in distributed systems
+- Auto-expiry prevents deadlock (if holder crashes)
+- Lua script ensures atomic release (only lock owner can release)
+- Use cases: inventory management, seat booking, ID generation
+
+---
+
+## Saga Pattern (Distributed Transactions)
+
+```python
+# Example: Order placement saga
+# Order Service → Payment Service → Inventory Service → Shipping Service
+
+class OrderSaga:
+    def __init__(self):
+        self.steps = []
+        self.compensations = []
+    
+    def add_step(self, action, compensation):
+        """
+        action: Function to execute
+        compensation: Function to undo (rollback) if later step fails
+        """
+        self.steps.append(action)
+        self.compensations.append(compensation)
+    
+    def execute(self, context):
+        """Execute saga steps; rollback on failure"""
+        executed_steps = 0
+        
+        try:
+            for i, step in enumerate(self.steps):
+                print(f"Executing step {i + 1}...")
+                step(context)
+                executed_steps += 1
+            
+            print("Saga completed successfully!")
+            return {"status": "success", "order_id": context.get("order_id")}
+        
+        except Exception as e:
+            print(f"Step failed: {e}. Rolling back...")
+            
+            # Execute compensations in reverse order
+            for i in range(executed_steps - 1, -1, -1):
+                try:
+                    print(f"Compensating step {i + 1}...")
+                    self.compensations[i](context)
+                except Exception as comp_error:
+                    print(f"Compensation failed: {comp_error}")
+            
+            return {"status": "failed", "error": str(e)}
+
+# Define saga steps
+def create_order(context):
+    order_id = generate_order_id()
+    db_execute("INSERT INTO orders (id, user_id, status) VALUES (?, ?, 'pending')", 
+               (order_id, context["user_id"]))
+    context["order_id"] = order_id
+
+def cancel_order(context):
+    db_execute("UPDATE orders SET status = 'cancelled' WHERE id = ?", 
+               (context["order_id"],))
+
+def charge_payment(context):
+    result = payment_service.charge(context["user_id"], context["amount"])
+    if not result["success"]:
+        raise Exception("Payment failed")
+    context["payment_id"] = result["payment_id"]
+
+def refund_payment(context):
+    payment_service.refund(context["payment_id"])
+
+def reserve_inventory(context):
+    result = inventory_service.reserve(context["product_id"], context["quantity"])
+    if not result["success"]:
+        raise Exception("Out of stock")
+    context["reservation_id"] = result["reservation_id"]
+
+def release_inventory(context):
+    inventory_service.release(context["reservation_id"])
+
+def create_shipment(context):
+    result = shipping_service.create(context["order_id"], context["address"])
+    if not result["success"]:
+        raise Exception("Shipping unavailable")
+    context["shipment_id"] = result["shipment_id"]
+
+def cancel_shipment(context):
+    shipping_service.cancel(context["shipment_id"])
+
+# Build saga
+order_saga = OrderSaga()
+order_saga.add_step(create_order, cancel_order)
+order_saga.add_step(charge_payment, refund_payment)
+order_saga.add_step(reserve_inventory, release_inventory)
+order_saga.add_step(create_shipment, cancel_shipment)
+
+# Execute
+context = {
+    "user_id": 123,
+    "product_id": 456,
+    "quantity": 2,
+    "amount": 99.99,
+    "address": "123 Main St"
+}
+
+result = order_saga.execute(context)
+print(f"Result: {result}")
+```
+
+**Interview talking points**:
+- No distributed transactions (ACID) across microservices
+- Saga = Sequence of local transactions + compensations
+- Choreography (event-driven) vs Orchestration (coordinator service)
+- Eventual consistency (order might be "pending" for seconds)
+
+---
+
+**End of Code-Level Patterns** 💻
+
+---
+
+# 🚪 API Gateway Patterns
+
+> **Every microservices interview asks: "How do clients talk to 50+ services?"** - Answer: API Gateway
+
+## What is an API Gateway?
+
+**Single entry point** for all client requests. Routes to appropriate backend services.
+
+```
+┌──────────┐
+│ Mobile   │ ─┐
+│ App      │  │
+└──────────┘  │
+              │    ┌─────────────────┐         ┌──────────────┐
+┌──────────┐  ├───▶│   API Gateway   │────────▶│ Auth Service │
+│ Web App  │  │    │                 │         └──────────────┘
+└──────────┘  │    │ - Routing       │         ┌──────────────┐
+              │    │ - Auth          │────────▶│ User Service │
+┌──────────┐  │    │ - Rate Limit    │         └──────────────┘
+│ Partner  │  │    │ - Load Balance  │         ┌──────────────┐
+│ API      │ ─┘    │ - Logging       │────────▶│ Order Service│
+└──────────┘       └─────────────────┘         └──────────────┘
+                                                ┌──────────────┐
+                                                │ Payment Svc  │
+                                                └──────────────┘
+```
+
+---
+
+## Core Responsibilities
+
+### 1. Request Routing
+
+```nginx
+# NGINX configuration example
+server {
+    listen 80;
+    server_name api.example.com;
+    
+    # User service
+    location /api/v1/users {
+        proxy_pass http://user-service:8001;
+    }
+    
+    # Order service
+    location /api/v1/orders {
+        proxy_pass http://order-service:8002;
+    }
+    
+    # Payment service
+    location /api/v1/payments {
+        proxy_pass http://payment-service:8003;
+    }
+}
+```
+
+### 2. Authentication & Authorization
+
+```python
+# API Gateway validates JWT before forwarding
+from fastapi import FastAPI, Header, HTTPException
+import jwt
+import requests
+
+app = FastAPI()
+
+SECRET_KEY = "your-secret-key"
+
+@app.middleware("http")
+async def auth_middleware(request, call_next):
+    """Validate JWT token for all requests"""
+    auth_header = request.headers.get("Authorization")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    
+    token = auth_header.split(" ")[1]
+    
+    try:
+        # Decode and validate JWT
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        
+        # Inject user info into request headers (for downstream services)
+        request.state.user_id = payload["user_id"]
+        request.state.role = payload.get("role", "user")
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    response = await call_next(request)
+    return response
+
+@app.get("/api/v1/orders")
+async def get_orders(request: Request):
+    """Forward to order service with user context"""
+    user_id = request.state.user_id
+    
+    # Forward request to order service
+    response = requests.get(
+        "http://order-service:8002/orders",
+        headers={"X-User-ID": str(user_id)}
+    )
+    
+    return response.json()
+```
+
+### 3. Rate Limiting (Protect Backend Services)
+
+```python
+# API Gateway enforces rate limits
+from fastapi import FastAPI, HTTPException
+import redis
+
+app = FastAPI()
+r = redis.Redis(host='localhost', port=6379)
+
+@app.middleware("http")
+async def rate_limit_middleware(request, call_next):
+    """Rate limit: 100 requests per minute per IP"""
+    client_ip = request.client.host
+    key = f"rate_limit:{client_ip}"
+    
+    # Increment request count
+    count = r.incr(key)
+    
+    if count == 1:
+        # First request, set expiry to 60 seconds
+        r.expire(key, 60)
+    
+    if count > 100:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Try again in 60 seconds.",
+            headers={"Retry-After": "60"}
+        )
+    
+    response = await call_next(request)
+    response.headers["X-RateLimit-Remaining"] = str(100 - count)
+    return response
+```
+
+### 4. Request/Response Transformation
+
+```python
+# API Gateway transforms external API to internal format
+@app.post("/api/v1/orders")
+async def create_order(external_request: dict):
+    """
+    External API: {"product": "iPhone", "qty": 2}
+    Internal API: {"product_id": 123, "quantity": 2, "user_id": 456}
+    """
+    
+    # Transform request
+    internal_request = {
+        "product_id": PRODUCT_MAPPING.get(external_request["product"]),
+        "quantity": external_request["qty"],
+        "user_id": request.state.user_id  # From JWT
+    }
+    
+    # Call internal service
+    response = requests.post(
+        "http://order-service:8002/internal/orders",
+        json=internal_request
+    )
+    
+    # Transform response
+    internal_response = response.json()
+    external_response = {
+        "orderId": internal_response["order_id"],
+        "status": internal_response["status"],
+        "estimatedDelivery": internal_response["estimated_delivery_date"]
+    }
+    
+    return external_response
+```
+
+### 5. Protocol Translation
+
+```python
+# API Gateway: REST (external) → gRPC (internal)
+import grpc
+from order_service_pb2 import OrderRequest
+from order_service_pb2_grpc import OrderServiceStub
+
+@app.get("/api/v1/orders/{order_id}")
+async def get_order(order_id: int):
+    """REST API for clients, gRPC to backend"""
+    
+    # Create gRPC channel
+    channel = grpc.insecure_channel('order-service:50051')
+    stub = OrderServiceStub(channel)
+    
+    # Call gRPC service
+    request = OrderRequest(order_id=order_id)
+    response = stub.GetOrder(request)
+    
+    # Convert gRPC response to REST JSON
+    return {
+        "orderId": response.order_id,
+        "status": response.status,
+        "items": [{"productId": item.product_id, "quantity": item.quantity} 
+                  for item in response.items]
+    }
+```
+
+---
+
+## Backend for Frontend (BFF) Pattern
+
+**Problem**: Mobile needs different data than web (mobile = low bandwidth)
+
+**Solution**: Separate API Gateway per client type
+
+```
+┌─────────────┐
+│ Mobile BFF  │ ─┐
+│             │  │   (Optimized for mobile)
+│ - Small     │  │   GET /mobile/feed
+│   payloads  │  │   → Returns compressed data
+│ - Image     │  │   → 480p images, not 4K
+│   resizing  │  │
+└─────────────┘  │
+                 │         ┌──────────────┐
+                 ├────────▶│ User Service │
+                 │         └──────────────┘
+┌─────────────┐  │         ┌──────────────┐
+│   Web BFF   │  ├────────▶│ Feed Service │
+│             │  │         └──────────────┘
+│ - Rich data │  │         ┌──────────────┐
+│ - Multiple  │  ├────────▶│ Media Service│
+│   calls     │  │         └──────────────┘
+└─────────────┘  │
+                 │
+┌─────────────┐  │
+│ Partner BFF │ ─┘
+│             │
+│ - Batching  │   (Optimized for B2B partners)
+│ - Webhooks  │   POST /partner/bulk-orders
+└─────────────┘   → Upload CSV, get webhook callback
+```
+
+**Code example**:
+
+```python
+# Mobile BFF: Optimized for low bandwidth
+@mobile_bff.get("/mobile/feed")
+async def get_mobile_feed(user_id: int):
+    """Lightweight feed for mobile"""
+    posts = await feed_service.get_posts(user_id, limit=20)
+    
+    # Only return essential fields
+    return [
+        {
+            "id": post.id,
+            "text": post.text[:200],  # Truncate
+            "image": resize_image(post.image_url, width=480),  # 480p
+            "likes": post.like_count  # Just count, not list of users
+        }
+        for post in posts
+    ]
+
+# Web BFF: Rich data for web
+@web_bff.get("/web/feed")
+async def get_web_feed(user_id: int):
+    """Full-featured feed for web"""
+    posts = await feed_service.get_posts(user_id, limit=50)
+    
+    # Fetch additional data (parallel calls)
+    user_ids = [post.author_id for post in posts]
+    users = await user_service.get_users_batch(user_ids)
+    
+    return [
+        {
+            "id": post.id,
+            "text": post.text,  # Full text
+            "image": post.image_url,  # 4K image
+            "author": {
+                "id": users[post.author_id].id,
+                "name": users[post.author_id].name,
+                "avatar": users[post.author_id].avatar
+            },
+            "likes": await like_service.get_like_details(post.id),  # Full list
+            "comments": await comment_service.get_comments(post.id, limit=5)
+        }
+        for post in posts
+    ]
+```
+
+---
+
+## API Gateway Technologies
+
+| Technology | Best For | Scale | Notes |
+|-----------|---------|-------|-------|
+| **NGINX** | Simple routing, static config | 100K+ RPS | Lightweight, battle-tested |
+| **Kong** | Plugins (auth, rate limit, logging) | 50K+ RPS | Built on NGINX, Lua plugins |
+| **AWS API Gateway** | Serverless, AWS ecosystem | Auto-scale | Pay-per-request, managed |
+| **Envoy** | Service mesh, dynamic routing | 100K+ RPS | Used by Istio, gRPC native |
+| **Zuul (Netflix)** | Java microservices, filters | 10K+ RPS | JVM-based, Netflix OSS |
+| **Traefik** | Kubernetes, Docker, auto-discovery | 50K+ RPS | Cloud-native, dynamic config |
+
+---
+
+## API Gateway vs Service Mesh
+
+**API Gateway**: **External** traffic (clients → backend)
+
+**Service Mesh**: **Internal** traffic (service → service)
+
+```
+┌──────────┐
+│ Client   │
+└────┬─────┘
+     │
+     ▼
+┌─────────────────┐  ◄─── API Gateway (external)
+│   API Gateway   │       - Authentication
+└────┬────────────┘       - Rate limiting
+     │                    - SSL termination
+     ▼
+┌─────────────────┐
+│  Service Mesh   │  ◄─── Service Mesh (internal)
+│  (Istio/Envoy)  │       - Service discovery
+│                 │       - Load balancing
+│  ┌───┐  ┌───┐  │       - Circuit breaking
+│  │ A │─▶│ B │  │       - Observability
+│  └───┘  └───┘  │
+│    │            │
+│    ▼            │
+│  ┌───┐          │
+│  │ C │          │
+│  └───┘          │
+└─────────────────┘
+```
+
+**When do you need both?**
+- API Gateway: If you have external clients (mobile, web, partners)
+- Service Mesh: If you have 10+ microservices talking to each other
+
+---
+
+## Interview Answer Template
+
+**Q: "How would you design an API Gateway for a ride-sharing app?"**
+
+**Answer framework**:
+
+1. **Requirements**:
+   - Handle 100K RPS (peak)
+   - 3 client types: Mobile (iOS/Android), Web, Driver App
+   - Must authenticate every request
+   - Rate limit: 1000 req/min per user
+
+2. **Technology choice**:
+   - Use **Kong** (NGINX + plugins)
+   - Why? Built-in rate limiting, JWT auth, observability
+   - Alternative: AWS API Gateway (if serverless)
+
+3. **Architecture**:
+```
+Mobile App ─┐
+Web App ────┼───▶ Kong API Gateway ───┐
+Driver App ─┘     (3 replicas)        │
+                  - JWT validation    │
+                  - Rate limiting     ├───▶ User Service
+                  - Request logging   │
+                                      ├───▶ Ride Service
+                                      │
+                                      ├───▶ Payment Service
+                                      │
+                                      └───▶ Notification Service
+```
+
+4. **Key decisions**:
+   - **BFF pattern**: Separate `/mobile/*` and `/web/*` endpoints
+   - **Rate limiting**: Redis-backed (shared state across gateway replicas)
+   - **Auth**: Validate JWT at gateway, inject user_id header for downstream
+   - **Caching**: Cache user profile at gateway (reduce Auth Service load)
+
+5. **Scaling**:
+   - Horizontal: 3 replicas behind load balancer (handle 100K RPS)
+   - Rate limiting: Redis cluster (failover for high availability)
+   - Monitoring: Prometheus metrics (latency, error rate, RPS per endpoint)
+
+---
+
+# 🔍 Distributed Tracing
+
+> **Interviewer asks: "Request is slow, how do you debug across 10 microservices?"** - Answer: Distributed Tracing
+
+## The Problem
+
+```
+User → API Gateway → Service A → Service B → Service C → Database
+                         │
+                         └────▶ Service D → Cache
+
+Which service is slow? 🤔
+```
+
+## The Solution: Trace Every Request
+
+**Distributed tracing** = Follow a single request across all services
+
+```
+Trace ID: abc123
+│
+├─ Span: API Gateway (10ms)
+│   │
+│   ├─ Span: Service A (50ms)
+│   │   │
+│   │   ├─ Span: Service B (30ms)
+│   │   │   └─ Span: Database query (25ms) ◄─── Bottleneck!
+│   │   │
+│   │   └─ Span: Service D (5ms)
+│   │       └─ Span: Cache lookup (2ms)
+│
+Total: 60ms
+```
+
+---
+
+## OpenTelemetry Example
+
+```python
+# Service A: Create a trace
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.jaeger import JaegerExporter
+import requests
+
+# Setup tracing
+trace.set_tracer_provider(TracerProvider())
+jaeger_exporter = JaegerExporter(
+    agent_host_name="localhost",
+    agent_port=6831,
+)
+trace.get_tracer_provider().add_span_processor(
+    BatchSpanProcessor(jaeger_exporter)
+)
+
+tracer = trace.get_tracer(__name__)
+
+# Instrument your code
+@app.get("/api/orders/{order_id}")
+async def get_order(order_id: int):
+    # Start a span for this operation
+    with tracer.start_as_current_span("get_order") as span:
+        span.set_attribute("order_id", order_id)
+        
+        # Call Service B (automatically creates child span)
+        with tracer.start_as_current_span("call_user_service"):
+            user_data = requests.get(
+                f"http://user-service:8001/users/{user_id}",
+                headers={"X-Trace-ID": span.get_span_context().trace_id}
+            )
+        
+        # Call database
+        with tracer.start_as_current_span("database_query"):
+            order = db.query("SELECT * FROM orders WHERE id = ?", order_id)
+        
+        return {"order": order, "user": user_data}
+```
+
+## What Gets Logged
+
+```json
+{
+  "traceId": "abc123",
+  "spanId": "span1",
+  "operationName": "get_order",
+  "startTime": 1700000000000,
+  "duration": 60,
+  "tags": {
+    "order_id": 12345,
+    "http.method": "GET",
+    "http.status_code": 200
+  },
+  "logs": [
+    {"timestamp": 1700000000010, "message": "Fetching user data"},
+    {"timestamp": 1700000000040, "message": "User data retrieved"}
+  ],
+  "references": [
+    {"refType": "CHILD_OF", "traceId": "abc123", "spanId": "span0"}
+  ]
+}
+```
+
+---
+
+## Trace Propagation (Pass Context Between Services)
+
+```python
+# Service A: Inject trace context into HTTP headers
+import requests
+from opentelemetry.propagate import inject
+
+headers = {}
+inject(headers)  # Adds traceparent header
+
+response = requests.get(
+    "http://service-b:8002/api/data",
+    headers=headers  # Propagates trace context
+)
+
+# Service B: Extract trace context from headers
+from opentelemetry.propagate import extract
+
+@app.get("/api/data")
+async def get_data(request: Request):
+    # Extract trace context from incoming request
+    context = extract(request.headers)
+    
+    # Create child span (linked to parent trace)
+    with tracer.start_as_current_span("get_data", context=context):
+        # Your code here
+        data = fetch_data()
+        return data
+```
+
+---
+
+## Sampling Strategies
+
+**Problem**: Tracing 1M requests/sec = too much data
+
+**Solution**: Sample intelligently
+
+| Strategy | When to Use | Example |
+|---------|-------------|---------|
+| **Always On** | Dev/staging | Trace 100% of requests |
+| **Probabilistic** | Production (high traffic) | Trace 1% of requests |
+| **Rate Limiting** | Production (medium traffic) | Trace 100 req/sec |
+| **Error-based** | Production (debugging) | Trace all errors + 1% success |
+| **Tail-based** | Advanced | Trace slow requests (>1s) + errors |
+
+```python
+# Probabilistic sampling: 1% of requests
+from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+
+sampler = TraceIdRatioBased(0.01)  # 1% sampling
+tracer_provider = TracerProvider(sampler=sampler)
+```
+
+---
+
+## Tracing Technologies
+
+| Technology | Best For | Notes |
+|-----------|---------|-------|
+| **Jaeger** | Self-hosted, Kubernetes | CNCF project, Cassandra/Elasticsearch backend |
+| **Zipkin** | Self-hosted, simple setup | Twitter OSS, in-memory or MySQL backend |
+| **AWS X-Ray** | AWS services | Managed, integrates with Lambda, ECS, etc. |
+| **Google Cloud Trace** | GCP services | Managed, integrates with GKE, Cloud Run |
+| **Datadog APM** | SaaS, full observability | Paid, includes metrics + logs + traces |
+| **New Relic** | SaaS, easy setup | Paid, automatic instrumentation |
+
+---
+
+## Interview Answer Template
+
+**Q: "How would you debug a slow request across microservices?"**
+
+**Answer**:
+
+1. **Use distributed tracing** (Jaeger or AWS X-Ray)
+   - Assign unique Trace ID to each request
+   - Propagate Trace ID via HTTP headers (traceparent)
+   - Each service creates spans (operation + timing)
+
+2. **Visualize the trace** (Jaeger UI shows waterfall):
+```
+GET /api/orders/123 (120ms total)
+├─ API Gateway (5ms)
+├─ Auth Service (10ms)
+├─ Order Service (100ms) ◄─── Slow!
+│  ├─ Database query (95ms) ◄─── Bottleneck!
+│  └─ Cache lookup (5ms)
+└─ User Service (5ms)
+```
+
+3. **Drill down**:
+   - Database query slow → Check EXPLAIN plan (missing index?)
+   - Service B slow → Check metrics (CPU/memory maxed out?)
+   - Network slow → Check service mesh metrics (retries? timeouts?)
+
+4. **Sampling**: Production traces 1% of requests (too expensive to trace all)
+
+5. **Correlation**: Link traces with logs (same Trace ID in log messages)
+
+---
+
+**End of API Gateway & Distributed Tracing** 🚪🔍
+
+---
+
+# 🗄️ Database Deep-Dive for Interviews
+
+> **Most system design questions involve database decisions** - Master this section!
+
+## Database Indexing (Often Poorly Understood!)
+
+### B-Tree Index (Default in Most Databases)
+
+**How it works**: Balanced tree, O(log n) lookups
+
+```
+Index on user_id:
+              [50]
+            /      \
+        [25]        [75]
+       /    \      /    \
+    [10]  [40]  [60]  [90]
+     ↓     ↓     ↓     ↓
+  (row1)(row2)(row3)(row4)
+```
+
+**Good for**:
+- Range queries: `WHERE age BETWEEN 25 AND 35`
+- Sorting: `ORDER BY created_at DESC`
+- Equality: `WHERE user_id = 12345`
+
+**Example**:
+```sql
+-- Slow: Full table scan (1 million rows)
+SELECT * FROM users WHERE email = 'john@example.com';
+-- Execution time: 500ms
+
+-- Fast: Index scan
+CREATE INDEX idx_email ON users(email);
+SELECT * FROM users WHERE email = 'john@example.com';
+-- Execution time: 2ms (250x faster!)
+```
+
+---
+
+### Composite Index (Multi-Column)
+
+**Order matters!**
+
+```sql
+-- Index on (country, city, age)
+CREATE INDEX idx_location_age ON users(country, city, age);
+
+-- ✅ Uses index (leftmost prefix)
+SELECT * FROM users WHERE country = 'USA';
+SELECT * FROM users WHERE country = 'USA' AND city = 'NYC';
+SELECT * FROM users WHERE country = 'USA' AND city = 'NYC' AND age > 25;
+
+-- ❌ Does NOT use index (missing leftmost column)
+SELECT * FROM users WHERE city = 'NYC';
+SELECT * FROM users WHERE age > 25;
+```
+
+**Rule**: Index can be used if query filters on **leftmost columns**
+
+**Interview example**:
+```sql
+-- Query: Find active users in NYC created in 2024
+SELECT * FROM users 
+WHERE city = 'NYC' 
+  AND status = 'active' 
+  AND created_at >= '2024-01-01';
+
+-- Option 1: Index on (city, status, created_at) ✅ Best
+-- Option 2: Index on (status, city, created_at) ❌ Wrong order
+-- Option 3: Three separate indexes ❌ Query uses only one
+```
+
+---
+
+### Covering Index (Index-Only Scan)
+
+**Definition**: Index contains all columns needed by query (no table lookup!)
+
+```sql
+-- Query: Get user names and emails
+SELECT user_id, name, email FROM users WHERE country = 'USA';
+
+-- Regular index: idx_country → Fetch rows from table (slow)
+CREATE INDEX idx_country ON users(country);
+
+-- Covering index: All columns in index → No table lookup (fast!)
+CREATE INDEX idx_country_covering ON users(country, user_id, name, email);
+```
+
+**Performance**:
+- Regular index: 100ms (index lookup + table lookup)
+- Covering index: 10ms (index lookup only) → **10x faster!**
+
+---
+
+### When Indexes HURT Performance
+
+**Problem**: Indexes slow down writes (INSERT/UPDATE/DELETE)
+
+```sql
+-- Table with 5 indexes
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    email VARCHAR(255),
+    name VARCHAR(255),
+    country VARCHAR(50),
+    city VARCHAR(50),
+    age INT
+);
+
+CREATE INDEX idx_email ON users(email);
+CREATE INDEX idx_name ON users(name);
+CREATE INDEX idx_country ON users(country);
+CREATE INDEX idx_city ON users(city);
+CREATE INDEX idx_age ON users(age);
+
+-- Every INSERT updates 6 data structures (table + 5 indexes)!
+INSERT INTO users VALUES (1, 'john@example.com', 'John', 'USA', 'NYC', 30);
+-- Execution time: 50ms (vs 5ms with no indexes)
+```
+
+**Interview answer**:
+- **Read-heavy**: Add more indexes (optimize SELECTs)
+- **Write-heavy**: Minimize indexes (optimize INSERTs)
+- **Common pattern**: Index foreign keys, unique columns, query filters (not everything!)
+
+---
+
+## Database Replication Strategies
+
+### 1. Single-Leader Replication (Primary-Secondary)
+
+**How it works**:
+```
+        ┌──────────────┐
+        │  PRIMARY DB  │ ◄─── All writes go here
+        │  (Read/Write)│
+        └──────┬───────┘
+               │
+        Replication log
+               │
+       ┌───────┴────────┐
+       ▼                ▼
+┌─────────────┐  ┌─────────────┐
+│  REPLICA 1  │  │  REPLICA 2  │ ◄─── Read-only
+│  (Read-Only)│  │  (Read-Only)│
+└─────────────┘  └─────────────┘
+```
+
+**Pros**:
+- Simple to understand
+- Strong consistency on primary
+- Read scaling (add more replicas)
+
+**Cons**:
+- Replication lag (replica might be seconds behind)
+- Primary is single point of failure
+
+**Interview scenario**:
+```
+User posts a comment:
+1. App writes to PRIMARY (user_id=123, comment="Hello")
+2. App redirects to profile page
+3. App reads from REPLICA (might not have new comment yet!) ❌
+
+Solution: "Read-your-writes" consistency
+→ After write, read from PRIMARY for 1 second
+→ Then switch to REPLICA
+```
+
+---
+
+### 2. Multi-Leader Replication (Master-Master)
+
+**How it works**: Multiple databases accept writes
+
+```
+┌──────────────┐     ┌──────────────┐
+│  LEADER 1    │────▶│  LEADER 2    │
+│  (US East)   │◀────│  (EU West)   │
+└──────────────┘     └──────────────┘
+     Write to            Write to
+     Leader 1            Leader 2
+        ▲                    ▲
+        │                    │
+    US users            European users
+```
+
+**Pros**:
+- Low latency (write to nearest leader)
+- High availability (both leaders can accept writes)
+
+**Cons**:
+- **Conflict resolution** (two users edit same row simultaneously)
+
+**Conflict example**:
+```
+User A (US): UPDATE users SET name = 'Alice' WHERE id = 1;
+User B (EU): UPDATE users SET name = 'Anna' WHERE id = 1;
+
+Which name wins? 🤔
+
+Conflict resolution strategies:
+1. Last-write-wins (timestamp) → "Anna" (if EU update is newer)
+2. Application-defined logic → Merge: "Alice/Anna"
+3. Prompt user to resolve → Show both versions, ask user to choose
+```
+
+---
+
+### 3. Leaderless Replication (Quorum-Based)
+
+**How it works**: Write to N replicas, read from N replicas, use voting
+
+```
+┌─────────────┐
+│  Client     │
+└──────┬──────┘
+       │
+   Write "X"
+       │
+┌──────┼──────┬──────┐
+▼      ▼      ▼      ▼
+┌───┐  ┌───┐  ┌───┐  ┌───┐
+│ A │  │ B │  │ C │  │ D │  (4 replicas)
+└───┘  └───┘  └───┘  └───┘
+ "X"    "X"    "X"   (old)  ← One replica failed!
+
+Read: Query 3 replicas
+ A="X", B="X", D=(old) → Return "X" (majority vote)
+```
+
+**Quorum formula**: W + R > N
+- N = Total replicas (e.g., 3)
+- W = Write quorum (e.g., 2) → Write succeeds if 2 replicas confirm
+- R = Read quorum (e.g., 2) → Read from 2 replicas, take majority
+
+**Example: Cassandra**
+```cql
+-- Write with quorum (2 out of 3 replicas)
+INSERT INTO users (id, name) VALUES (1, 'Alice')
+WITH CONSISTENCY QUORUM;
+
+-- Read with quorum
+SELECT * FROM users WHERE id = 1
+WITH CONSISTENCY QUORUM;
+```
+
+**Interview talking points**:
+- **No leader** = No single point of failure
+- **Eventual consistency** = Replicas might disagree temporarily
+- **Used by**: Cassandra, DynamoDB, Riak
+
+---
+
+## Database Sharding (Horizontal Partitioning)
+
+### When to Shard?
+
+❌ **DON'T shard if**:
+- < 1TB data (vertical scaling + read replicas work fine)
+- < 10K QPS (single database can handle this)
+
+✅ **DO shard if**:
+- > 10TB data (single database can't store it)
+- > 100K QPS (single database CPU/memory maxed out)
+- Hot partitions (some users generate 100x more traffic)
+
+---
+
+### Sharding Strategy 1: Hash-Based
+
+**Partition by hash of user_id**
+
+```
+user_id → hash(user_id) % 4 → shard_number
+
+user_id=123 → hash=7 → 7 % 4 = 3 → Shard 3
+user_id=456 → hash=2 → 2 % 4 = 2 → Shard 2
+
+┌─────────────┐
+│   Shard 0   │  user_id ∈ {4, 8, 12, ...}
+├─────────────┤
+│   Shard 1   │  user_id ∈ {1, 5, 9, ...}
+├─────────────┤
+│   Shard 2   │  user_id ∈ {2, 6, 10, ...}
+├─────────────┤
+│   Shard 3   │  user_id ∈ {3, 7, 11, ...}
+└─────────────┘
+```
+
+**Pros**:
+- Even data distribution
+- Simple to implement
+
+**Cons**:
+- Resharding is hard (if you add Shard 4, all keys need rehashing!)
+- Range queries don't work (`WHERE user_id BETWEEN 100 AND 200` spans all shards)
+
+**Solution for resharding**: Consistent hashing (see Code Patterns section)
+
+---
+
+### Sharding Strategy 2: Range-Based
+
+**Partition by ranges of user_id**
+
+```
+┌─────────────────────┐
+│   Shard 0           │  user_id: 1 - 1,000,000
+├─────────────────────┤
+│   Shard 1           │  user_id: 1,000,001 - 2,000,000
+├─────────────────────┤
+│   Shard 2           │  user_id: 2,000,001 - 3,000,000
+└─────────────────────┘
+```
+
+**Pros**:
+- Range queries work (`WHERE user_id BETWEEN 1M AND 2M` → Query Shard 1 only)
+- Easy to add new shards (just add Shard 3 for IDs 3M-4M)
+
+**Cons**:
+- Uneven distribution (recent users more active → Shard 2 overloaded)
+
+**Example**: Time-series data (logs, events)
+```
+┌─────────────────────┐
+│   Shard 0           │  2024-01-01 to 2024-01-31
+├─────────────────────┤
+│   Shard 1           │  2024-02-01 to 2024-02-29
+├─────────────────────┤
+│   Shard 2 (HOT!)    │  2024-03-01 to 2024-03-31 ◄─── Most queries here
+└─────────────────────┘
+```
+
+---
+
+### Sharding Strategy 3: Directory-Based (Lookup Table)
+
+**Use a lookup service to find which shard has the data**
+
+```
+┌──────────────────┐
+│ Routing Service  │  (user_id → shard mapping)
+│                  │
+│ user_id | shard  │
+│ --------|-----   │
+│   123   |   0    │
+│   456   |   2    │
+│   789   |   1    │
+└──────────────────┘
+         │
+    ┌────┼────┬────┐
+    ▼    ▼    ▼    ▼
+  Shard0 Shard1 Shard2
+```
+
+**Pros**:
+- Flexible (can move user 123 from Shard 0 → Shard 1 anytime)
+- Solves hot partition problem (move celebrity users to dedicated shard)
+
+**Cons**:
+- Routing service is single point of failure
+- Extra network hop (latency)
+
+**Interview example: Instagram**
+```
+Normal users → Sharded by hash(user_id)
+Celebrities (Kim Kardashian, 300M followers) → Dedicated shard
+```
+
+---
+
+### Cross-Shard Queries (The Hard Problem!)
+
+**Problem**: Query spans multiple shards
+
+```sql
+-- "Get all users named John" → Must query ALL shards! ❌
+SELECT * FROM users WHERE name = 'John';
+
+-- "Get posts for user_id=123" → Query single shard ✅
+SELECT * FROM posts WHERE user_id = 123;
+```
+
+**Solution strategies**:
+1. **Denormalize**: Store redundant data to avoid cross-shard queries
+2. **Application-level joins**: Query each shard, merge results in app
+3. **AVOID sharding on this table**: Not all tables need sharding!
+
+---
+
+## Replication + Sharding Combined
+
+**Most production systems use BOTH**:
+
+```
+┌────────────────────────────────┐
+│         Shard 0                │
+│  ┌──────────┐   ┌──────────┐  │
+│  │ PRIMARY  │──▶│ REPLICA  │  │
+│  └──────────┘   └──────────┘  │
+└────────────────────────────────┘
+
+┌────────────────────────────────┐
+│         Shard 1                │
+│  ┌──────────┐   ┌──────────┐  │
+│  │ PRIMARY  │──▶│ REPLICA  │  │
+│  └──────────┘   └──────────┘  │
+└────────────────────────────────┘
+
+┌────────────────────────────────┐
+│         Shard 2                │
+│  ┌──────────┐   ┌──────────┐  │
+│  │ PRIMARY  │──▶│ REPLICA  │  │
+│  └──────────┘   └──────────┘  │
+└────────────────────────────────┘
+```
+
+**Benefits**:
+- **Sharding**: Scale writes (distribute across shards)
+- **Replication**: Scale reads (read from replicas) + high availability
+
+**Example: Instagram**
+- 1,000 shards (each shard = 1 primary + 2 replicas)
+- 3,000 PostgreSQL databases total!
+
+---
+
+## SQL vs NoSQL Decision Tree (For Interviews)
+
+```
+Start
+  │
+  ▼
+Need ACID transactions?
+(e.g., banking, payments)
+  │
+  ├─ YES → Use SQL (PostgreSQL, MySQL)
+  │
+  ▼ NO
+Need complex joins?
+(e.g., social graph, e-commerce)
+  │
+  ├─ YES → Use SQL
+  │
+  ▼ NO
+Need >100K QPS or >10TB data?
+  │
+  ├─ NO → Use SQL (default choice!)
+  │
+  ▼ YES
+Data model is simple (key-value or document)?
+  │
+  ├─ YES → Use NoSQL
+  │        └─ Document: MongoDB, DynamoDB
+  │        └─ Key-Value: Redis, DynamoDB
+  │        └─ Wide-Column: Cassandra, HBase
+  │
+  ▼ NO
+Use SQL + sharding (Instagram, Uber, Twitter all use sharded PostgreSQL!)
+```
+
+---
+
+## Interview Answer Template
+
+**Q: "Instagram has 2 billion users. How do you store user data?"**
+
+**Answer**:
+
+1. **Start with PostgreSQL** (SQL):
+   - ACID transactions (ensure data consistency)
+   - Schema validation (enforce user data structure)
+   - Battle-tested (Instagram uses sharded PostgreSQL!)
+
+2. **Vertical scaling first** (delay sharding):
+   - Scale up to 96-core, 512GB RAM machine
+   - Add read replicas (5 replicas for read scaling)
+   - Use connection pooling (PgBouncer)
+   - Result: Can handle 10M users, 10K QPS
+
+3. **Shard when needed** (>100M users):
+   - Shard by `hash(user_id) % 1000` → 1,000 shards
+   - Each shard: 2M users, 100GB data
+   - Each shard: 1 primary + 2 replicas (high availability)
+
+4. **Optimize**:
+   - **Indexes**: `user_id` (primary key), `email` (login), `username` (profile lookup)
+   - **Caching**: Redis cache hot users (top 1% = 20M users cached)
+   - **CDN**: Profile pictures on CloudFront (not in database!)
+
+5. **Handling hot partitions**:
+   - Celebrities → Dedicated shard (avoid overloading one shard)
+   - Use directory-based sharding for flexibility
+
+---
+
+**End of Database Deep-Dive** 🗄️
+
+---
+
+# 📝 More System Design Interview Questions
+
+> **Complete walkthroughs for 10 common questions**
+
+---
+
+## 1. Design Dropbox / Google Drive
+
+**Requirements**:
+- Upload/download files (any size, up to 10GB)
+- Sync across devices (desktop, mobile, web)
+- Share files with other users
+- Version history (restore previous versions)
+- Scale: 500M users, 100M DAU, 10PB total storage
+
+---
+
+### High-Level Architecture
+
+```
+┌────────────┐
+│   Client   │ (Desktop/Mobile/Web)
+└──────┬─────┘
+       │
+       ▼
+┌─────────────────┐
+│  API Gateway    │ (Upload/Download/Sync endpoints)
+└────────┬────────┘
+         │
+    ┌────┼────┬─────────┐
+    ▼    ▼    ▼         ▼
+┌───────┐ ┌────────┐ ┌──────────┐
+│ Auth  │ │ Meta   │ │ Sync     │
+│ Svc   │ │ Svc    │ │ Service  │
+└───────┘ └───┬────┘ └────┬─────┘
+              │           │
+              ▼           ▼
+         ┌──────────┐  ┌─────────────┐
+         │ MySQL    │  │ Message     │
+         │ (Metadata)│  │ Queue       │
+         └──────────┘  └─────────────┘
+
+         ┌──────────────────────┐
+         │  Blob Storage (S3)   │ (Actual files)
+         └──────────────────────┘
+```
+
+---
+
+### API Design
+
+```
+POST   /api/v1/files/upload
+GET    /api/v1/files/{file_id}/download
+GET    /api/v1/files/{file_id}/metadata
+POST   /api/v1/files/{file_id}/share
+GET    /api/v1/sync/changes?since=timestamp
+```
+
+---
+
+### Data Model
+
+**MySQL (Metadata)**:
+```sql
+CREATE TABLE users (
+    user_id BIGINT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE,
+    storage_used BIGINT,  -- Bytes
+    storage_quota BIGINT  -- 15GB free, 2TB paid
+);
+
+CREATE TABLE files (
+    file_id VARCHAR(64) PRIMARY KEY,  -- UUID
+    user_id BIGINT,
+    filename VARCHAR(255),
+    file_size BIGINT,
+    mime_type VARCHAR(100),
+    s3_key VARCHAR(512),  -- s3://bucket/user_123/file.pdf
+    version INT,  -- Increments on update
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_updated_at (updated_at)  -- For sync
+);
+
+CREATE TABLE file_versions (
+    version_id BIGINT PRIMARY KEY,
+    file_id VARCHAR(64),
+    version INT,
+    s3_key VARCHAR(512),  -- s3://bucket/user_123/file_v2.pdf
+    file_size BIGINT,
+    created_at TIMESTAMP,
+    INDEX idx_file_id (file_id)
+);
+
+CREATE TABLE file_shares (
+    share_id BIGINT PRIMARY KEY,
+    file_id VARCHAR(64),
+    owner_user_id BIGINT,
+    shared_with_user_id BIGINT,
+    permission ENUM('read', 'write'),
+    created_at TIMESTAMP
+);
+```
+
+---
+
+### Key Design Decisions
+
+#### 1. File Chunking (Large File Upload)
+
+**Problem**: Uploading 10GB file in one request = timeout, no resume
+
+**Solution**: Split file into 4MB chunks
+
+```python
+def upload_file(file_path):
+    """Upload large file in chunks"""
+    file_id = generate_uuid()
+    chunk_size = 4 * 1024 * 1024  # 4MB
+    
+    with open(file_path, 'rb') as f:
+        chunk_number = 0
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            
+            # Upload chunk to S3
+            s3_key = f"uploads/{file_id}/chunk_{chunk_number}"
+            s3.put_object(Bucket='dropbox-storage', Key=s3_key, Body=chunk)
+            
+            chunk_number += 1
+    
+    # Notify server: all chunks uploaded
+    response = requests.post(
+        '/api/v1/files/complete_upload',
+        json={
+            'file_id': file_id,
+            'filename': 'document.pdf',
+            'total_chunks': chunk_number
+        }
+    )
+    
+    return response.json()
+```
+
+**Benefits**:
+- Resume upload (if chunk 5 fails, restart from chunk 5)
+- Parallel uploads (upload chunks simultaneously)
+- Better progress bar (show 65% uploaded)
+
+---
+
+#### 2. File Synchronization (Avoid Re-Downloading Everything)
+
+**Problem**: User has 1000 files. Desktop app starts → should it download all 1000 files?
+
+**Solution**: Delta sync (only download changes since last sync)
+
+```python
+# Client stores last sync timestamp
+last_sync_time = "2024-03-15T10:30:00Z"
+
+# Ask server: what changed since then?
+response = requests.get(f'/api/v1/sync/changes?since={last_sync_time}')
+
+changes = response.json()
+# {
+#   "files": [
+#     {"file_id": "abc", "action": "modified", "version": 3},
+#     {"file_id": "xyz", "action": "deleted"},
+#     {"file_id": "new", "action": "created", "filename": "photo.jpg"}
+#   ]
+# }
+
+# Download only modified/created files
+for change in changes['files']:
+    if change['action'] == 'created' or change['action'] == 'modified':
+        download_file(change['file_id'])
+    elif change['action'] == 'deleted':
+        delete_local_file(change['file_id'])
+
+# Update last sync timestamp
+last_sync_time = now()
+```
+
+**Server implementation**:
+```python
+@app.get('/api/v1/sync/changes')
+def get_changes(user_id: int, since: datetime):
+    """Return files changed since timestamp"""
+    changes = db.query(
+        """
+        SELECT file_id, filename, version, updated_at, is_deleted
+        FROM files
+        WHERE user_id = ? AND updated_at > ?
+        ORDER BY updated_at ASC
+        """,
+        (user_id, since)
+    )
+    
+    return {
+        "files": [
+            {
+                "file_id": row.file_id,
+                "action": "deleted" if row.is_deleted else "modified",
+                "version": row.version,
+                "filename": row.filename
+            }
+            for row in changes
+        ]
+    }
+```
+
+---
+
+#### 3. Conflict Resolution (Two Devices Edit Same File)
+
+**Scenario**:
+```
+Device A (offline): Edits document.txt → version 3
+Device B (offline): Edits document.txt → version 3
+Both sync to server → Conflict! 🤔
+```
+
+**Solution 1: Last-Write-Wins** (Simple but lossy)
+```python
+# Server keeps latest version by timestamp
+if file.version == incoming_version:
+    if incoming_timestamp > file.updated_at:
+        # Incoming version is newer, overwrite
+        update_file(file_id, incoming_data)
+    else:
+        # Existing version is newer, reject
+        return {"error": "Conflict: File was modified by another device"}
+```
+
+**Solution 2: Create Conflict Copy** (Dropbox approach)
+```python
+# Keep both versions
+original_file = "document.txt"  # Version from Device A
+conflict_file = "document (Device B's conflicted copy).txt"
+
+# User manually merges later
+```
+
+---
+
+#### 4. Storage Optimization (Deduplication)
+
+**Problem**: 1000 users upload same "company_logo.png" → Store 1000 copies? Wasteful!
+
+**Solution**: Content-based addressing (hash file content)
+
+```python
+import hashlib
+
+def upload_file(file_data, filename):
+    # Calculate SHA-256 hash of file content
+    file_hash = hashlib.sha256(file_data).hexdigest()
+    
+    # Check if file with same hash already exists
+    existing_file = db.query(
+        "SELECT s3_key FROM files WHERE content_hash = ?",
+        (file_hash,)
+    )
+    
+    if existing_file:
+        # File already exists! Just create metadata entry (no S3 upload)
+        db.execute(
+            "INSERT INTO files (user_id, filename, s3_key, content_hash) VALUES (?, ?, ?, ?)",
+            (user_id, filename, existing_file.s3_key, file_hash)
+        )
+        return {"status": "deduplicated"}
+    else:
+        # New file, upload to S3
+        s3_key = f"files/{file_hash[:2]}/{file_hash}"
+        s3.put_object(Bucket='dropbox-storage', Key=s3_key, Body=file_data)
+        
+        db.execute(
+            "INSERT INTO files (user_id, filename, s3_key, content_hash) VALUES (?, ?, ?, ?)",
+            (user_id, filename, s3_key, file_hash)
+        )
+        return {"status": "uploaded"}
+```
+
+**Savings**: If 10K users upload same 10MB file → Store 10MB once (not 100GB!)
+
+---
+
+### Capacity Estimation
+
+```
+Users: 500M total, 100M DAU
+Average storage per user: 1GB
+Total storage: 500M × 1GB = 500PB
+
+Daily uploads: 100M users × 2 files/day × 5MB = 1PB/day
+QPS: 100M DAU × 10 actions/day / 86400 sec ≈ 11.5K QPS
+
+Bandwidth:
+- Upload: 1PB/day / 86400 sec ≈ 12GB/s
+- Download: 3x upload (read-heavy) = 36GB/s
+
+Metadata database: 500M users × 100 files × 1KB = 50TB (MySQL sharded by user_id)
+```
+
+---
+
+### Interview Talking Points
+
+✅ **Mention**:
+- File chunking (resume uploads, parallel uploads)
+- Delta sync (only download changes, not all files)
+- Conflict resolution (last-write-wins vs conflict copies)
+- Deduplication (content hashing saves storage)
+- CDN for downloads (S3 + CloudFront)
+
+❌ **Avoid**:
+- "Just store files in database" (use blob storage: S3, GCS)
+- "Real-time sync" (polling every 30 seconds is fine for Dropbox)
+
+---
+
+## 2. Design Netflix (Video Streaming)
+
+**Requirements**:
+- Stream video (720p, 1080p, 4K)
+- Personalized recommendations
+- Resume playback from any device
+- Scale: 200M users, 100M DAU, 10K titles, 1B hours watched/month
+
+---
+
+### High-Level Architecture
+
+```
+┌────────────┐
+│   Client   │ (Web/Mobile/Smart TV)
+└──────┬─────┘
+       │
+       ▼
+┌─────────────────┐
+│  CDN (CloudFront)│ ◄─── 95% of traffic (video streaming)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  API Gateway    │
+└────────┬────────┘
+         │
+    ┌────┼────┬──────────┬─────────┐
+    ▼    ▼    ▼          ▼         ▼
+┌───────┐ ┌──────┐ ┌─────────┐ ┌─────────┐
+│ Auth  │ │ User │ │ Video   │ │ Rec Svc │
+│ Svc   │ │ Svc  │ │ Service │ │ (ML)    │
+└───────┘ └──────┘ └────┬────┘ └─────────┘
+                        │
+                        ▼
+                   ┌──────────┐
+                   │ MySQL    │ (Video metadata)
+                   └──────────┘
+
+                   ┌──────────────────────┐
+                   │  S3 (Video Files)    │ (Master files)
+                   └──────────────────────┘
+```
+
+---
+
+### API Design
+
+```
+GET    /api/v1/browse?category=action
+GET    /api/v1/video/{video_id}/metadata
+GET    /api/v1/video/{video_id}/stream?quality=1080p
+POST   /api/v1/playback/resume
+GET    /api/v1/recommendations/personalized
+```
+
+---
+
+### Key Design Decisions
+
+#### 1. Adaptive Bitrate Streaming (Handle Varying Network Speed)
+
+**Problem**: User's network speed changes (WiFi → 4G) → buffering!
+
+**Solution**: Encode video at multiple bitrates, client switches dynamically
+
+```
+Original video (4K master)
+    ↓
+Transcoding pipeline
+    ↓
+Output:
+- 240p (400 kbps)  ← Low bandwidth
+- 480p (1 Mbps)
+- 720p (3 Mbps)
+- 1080p (5 Mbps)
+- 4K (15 Mbps)     ← High bandwidth
+
+Client measures bandwidth every 10 seconds:
+- Bandwidth = 2 Mbps → Play 480p
+- Bandwidth drops to 500 kbps → Switch to 240p (no buffering!)
+- Bandwidth increases to 6 Mbps → Switch to 1080p
+```
+
+**Technology**: HLS (HTTP Live Streaming) or DASH
+
+**HLS manifest file** (.m3u8):
+```
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=426x240
+240p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x480
+480p.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720
+720p.m3u8
+```
+
+Each quality has its own playlist (e.g., 720p.m3u8):
+```
+#EXTM3U
+#EXTINF:10.0
+segment0.ts  ← 10-second video chunk
+#EXTINF:10.0
+segment1.ts
+#EXTINF:10.0
+segment2.ts
+```
+
+Client downloads chunks progressively (not entire video upfront).
+
+---
+
+#### 2. Video Encoding Pipeline (Offline Processing)
+
+**When**: New movie/show uploaded → background job encodes it
+
+```
+┌─────────────────┐
+│ Content Studio  │ (Uploads 4K master file)
+└────────┬────────┘
+         │
+         ▼
+┌────────────────────────────────┐
+│  S3 (Raw Video Storage)        │
+│  movie_master.mp4 (50GB)       │
+└────────┬───────────────────────┘
+         │
+         ▼ (S3 event triggers Lambda)
+┌────────────────────────────────┐
+│  AWS Elemental MediaConvert    │ (Transcode to 5 resolutions)
+│  - 240p, 480p, 720p, 1080p, 4K │
+│  - Generate HLS segments       │
+└────────┬───────────────────────┘
+         │
+         ▼
+┌────────────────────────────────┐
+│  S3 (Processed Video Storage)  │
+│  movie/240p/segment0.ts        │
+│  movie/480p/segment0.ts        │
+│  ...                           │
+└────────┬───────────────────────┘
+         │
+         ▼ (Push to CDN edge locations)
+┌────────────────────────────────┐
+│  CloudFront CDN                │ (Users stream from nearest edge)
+└────────────────────────────────┘
+```
+
+**Encoding time**: 2-hour movie → 30 minutes to encode (parallel processing)
+
+---
+
+#### 3. Resume Playback (Across Devices)
+
+**Data model**:
+```sql
+CREATE TABLE playback_position (
+    user_id BIGINT,
+    video_id BIGINT,
+    position_seconds INT,  -- 1847 (30 min 47 sec into movie)
+    updated_at TIMESTAMP,
+    PRIMARY KEY (user_id, video_id)
+);
+```
+
+**Client updates position every 10 seconds**:
+```python
+# Client (JavaScript)
+setInterval(() => {
+    const current_position = video_player.currentTime();  // 1850 seconds
+    
+    fetch('/api/v1/playback/resume', {
+        method: 'POST',
+        body: JSON.stringify({
+            video_id: 12345,
+            position_seconds: Math.floor(current_position)
+        })
+    });
+}, 10000);  // Every 10 seconds
+```
+
+**Server** (write to database):
+```python
+@app.post('/api/v1/playback/resume')
+def update_playback_position(user_id: int, video_id: int, position_seconds: int):
+    db.execute(
+        """
+        INSERT INTO playback_position (user_id, video_id, position_seconds, updated_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE 
+            position_seconds = ?,
+            updated_at = NOW()
+        """,
+        (user_id, video_id, position_seconds, position_seconds)
+    )
+```
+
+**Client loads position on start**:
+```python
+# Client fetches last position
+response = requests.get(f'/api/v1/playback/{video_id}/position')
+position = response.json()['position_seconds']  # 1847
+
+# Seek to saved position
+video_player.seek(position)
+```
+
+---
+
+#### 4. Personalized Recommendations (Machine Learning)
+
+**Architecture**:
+```
+User watches video → Event logged to Kafka → ML pipeline
+                                               ↓
+                                    ┌──────────────────────┐
+                                    │ Recommendation Model │
+                                    │ (Collaborative       │
+                                    │  Filtering)          │
+                                    └──────────┬───────────┘
+                                               ↓
+                                    ┌──────────────────────┐
+                                    │ Pre-computed Results │
+                                    │ (Redis Cache)        │
+                                    │ user:123 → [v1, v2]  │
+                                    └──────────────────────┘
+```
+
+**Two-phase approach**:
+1. **Offline** (nightly batch job): Train model, pre-compute recommendations for all users
+2. **Online** (API request): Fetch pre-computed recommendations from Redis
+
+**Why pre-compute?**
+- ML inference is slow (100ms to rank 10K videos)
+- Pre-computing = instant response (2ms Redis lookup)
+
+**Algorithm** (simplified collaborative filtering):
+```python
+# Find users similar to you
+similar_users = find_users_with_similar_viewing_history(user_id=123)
+
+# Recommend videos they watched but you haven't
+recommendations = []
+for similar_user in similar_users:
+    their_videos = get_watched_videos(similar_user)
+    my_videos = get_watched_videos(user_id=123)
+    
+    new_videos = their_videos - my_videos  # Set difference
+    recommendations.extend(new_videos)
+
+# Rank by popularity + genre preference
+recommendations = rank_videos(recommendations, user_preferences)
+
+return recommendations[:20]  # Top 20
+```
+
+---
+
+### Capacity Estimation
+
+```
+Users: 200M total, 100M DAU
+Videos watched: 1B hours/month = 33M hours/day
+Average watch time: 33M hours / 100M users = 20 min/user/day
+
+Video storage:
+- 10K titles × 2 hours avg × 5 qualities × 3GB per quality = 300TB (master + transcoded)
+- With CDN caching: 3PB (replicated to 100 edge locations)
+
+Bandwidth:
+- 1B hours/month streaming
+- Assume 3 Mbps average (mix of 720p/1080p)
+- 1B hours × 3600 sec × 3 Mbps / (30 days × 86400 sec) ≈ 4.2 Tbps (terabits per second!)
+
+QPS:
+- Metadata API: 100M users × 10 requests/day / 86400 ≈ 11.5K QPS
+- Video streaming: Served by CDN (not backend API)
+```
+
+---
+
+### Interview Talking Points
+
+✅ **Mention**:
+- Adaptive bitrate streaming (HLS/DASH)
+- CDN for video delivery (99% of bandwidth)
+- Offline transcoding (AWS MediaConvert)
+- Resume playback (simple database table)
+- Pre-computed recommendations (not real-time ML inference)
+
+❌ **Avoid**:
+- "Store video in database" (use S3 + CDN)
+- "Real-time ML inference on every request" (too slow, pre-compute nightly)
+
+---
+
+## 3. Design Web Crawler (Google Bot)
+
+**Requirements**:
+- Crawl 10 billion web pages
+- Respect robots.txt (don't crawl disallowed pages)
+- Avoid infinite loops (cyclic links)
+- Politeness (don't overwhelm servers with requests)
+- Freshness (re-crawl popular pages daily, obscure pages monthly)
+- Scale: 10K pages/sec crawl rate
+
+---
+
+### High-Level Architecture
+
+```
+┌─────────────────────┐
+│  Seed URLs          │ (Starting point: reddit.com, nytimes.com, ...)
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  URL Frontier       │ (Queue of URLs to crawl)
+│  (Priority Queue)   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Fetcher Threads    │ (100 workers fetch HTML in parallel)
+│  (HTTP GET)         │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  HTML Parser        │ (Extract text + links)
+└──────────┬──────────┘
+           │
+      ┌────┼────┐
+      ▼    ▼    ▼
+┌─────────┐ ┌──────────────┐ ┌─────────────────┐
+│ Content │ │ URL Extractor│ │ Duplicate Checker│
+│ Store   │ │ (Find links) │ │ (Bloom Filter)   │
+│ (S3)    │ └──────┬───────┘ └─────────────────┘
+└─────────┘        │
+                   ▼
+            Add new URLs to frontier (loop)
+```
+
+---
+
+### Key Components
+
+#### 1. URL Frontier (Priority Queue)
+
+**Challenge**: Not all URLs are equal priority
+
+```
+High priority: nytimes.com (crawl every hour)
+Low priority: myunknownblog.com (crawl every month)
+```
+
+**Solution**: Multi-level priority queue
+
+```python
+from queue import PriorityQueue
+
+class URLFrontier:
+    def __init__(self):
+        self.queues = {
+            'high': PriorityQueue(),     # Popular sites (crawl hourly)
+            'medium': PriorityQueue(),   # Normal sites (crawl daily)
+            'low': PriorityQueue()       # Obscure sites (crawl monthly)
+        }
+    
+    def add_url(self, url, priority='medium'):
+        """Add URL to appropriate queue"""
+        timestamp = time.time()
+        self.queues[priority].put((timestamp, url))
+    
+    def get_next_url(self):
+        """Get next URL to crawl (high priority first)"""
+        for priority in ['high', 'medium', 'low']:
+            if not self.queues[priority].empty():
+                _, url = self.queues[priority].get()
+                return url
+        return None
+```
+
+---
+
+#### 2. Duplicate Detection (Avoid Crawling Same Page Twice)
+
+**Problem**: Same page linked from multiple places → crawl once!
+
+**Solution**: Bloom filter (space-efficient set membership)
+
+```python
+from bloom_filter import BloomFilter
+
+# Bloom filter: 10B URLs, 1% false positive rate → ~1.5GB memory
+seen_urls = BloomFilter(max_elements=10_000_000_000, error_rate=0.01)
+
+def should_crawl(url):
+    """Check if URL already crawled"""
+    if url in seen_urls:
+        return False  # Already crawled (or false positive, rare)
+    else:
+        seen_urls.add(url)
+        return True  # New URL, crawl it!
+```
+
+**Alternative**: Store URL hashes in distributed database (Cassandra)
+```python
+url_hash = hashlib.sha256(url.encode()).hexdigest()
+
+# Check if exists
+existing = cassandra.execute(
+    "SELECT 1 FROM crawled_urls WHERE url_hash = ?",
+    (url_hash,)
+)
+
+if not existing:
+    # New URL, crawl it
+    cassandra.execute(
+        "INSERT INTO crawled_urls (url_hash, crawled_at) VALUES (?, NOW())",
+        (url_hash,)
+    )
+```
+
+---
+
+#### 3. Politeness (Don't Overwhelm Servers)
+
+**Problem**: Crawling nytimes.com at 100 req/sec → DDoS attack! ❌
+
+**Solution**: Rate limit per domain
+
+```python
+from collections import defaultdict
+import time
+
+class PoliteCrawler:
+    def __init__(self):
+        self.last_crawl_time = defaultdict(float)  # domain → timestamp
+        self.crawl_delay = 1.0  # 1 second between requests to same domain
+    
+    def fetch(self, url):
+        domain = extract_domain(url)  # "nytimes.com"
+        
+        # Check if we need to wait
+        time_since_last_crawl = time.time() - self.last_crawl_time[domain]
+        if time_since_last_crawl < self.crawl_delay:
+            sleep_time = self.crawl_delay - time_since_last_crawl
+            time.sleep(sleep_time)
+        
+        # Fetch page
+        response = requests.get(url)
+        
+        # Update last crawl time
+        self.last_crawl_time[domain] = time.time()
+        
+        return response.text
+```
+
+**Bonus**: Read robots.txt (respect website's crawl policy)
+```python
+# GET https://nytimes.com/robots.txt
+# User-agent: *
+# Disallow: /admin/
+# Crawl-delay: 2
+
+def is_allowed(url):
+    """Check robots.txt"""
+    domain = extract_domain(url)
+    robots_txt = fetch_robots_txt(domain)
+    
+    # Parse robots.txt (use libraries like robotparser)
+    return robots_txt.can_fetch("Googlebot", url)
+```
+
+---
+
+#### 4. Distributed Crawling (Scale to 10K Pages/Sec)
+
+**Single machine**: 10 pages/sec (limited by network I/O)
+
+**Solution**: 1000 crawler machines (10K pages/sec total)
+
+**Architecture**:
+```
+┌─────────────────────┐
+│  URL Coordinator    │ (Kafka: distributes URLs to crawlers)
+│  (Kafka Topic)      │
+└──────────┬──────────┘
+           │
+     ┌─────┼─────┬─────┬───────┐
+     ▼     ▼     ▼     ▼       ▼
+  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ... (1000 crawler workers)
+  │ C1 │ │ C2 │ │ C3 │ │ C4 │
+  └─┬──┘ └─┬──┘ └─┬──┘ └─┬──┘
+    │      │      │      │
+    └──────┴──────┴──────┴────────▶ Store content in S3
+```
+
+**Partitioning strategy**: Assign domains to workers (consistent hashing)
+```python
+# Worker 1 crawls: *.com domains (hash % 1000 == 0)
+# Worker 2 crawls: *.com domains (hash % 1000 == 1)
+# ...
+
+worker_id = hash(domain) % num_workers
+```
+
+**Benefit**: Same worker always crawls same domain → easy to enforce politeness per domain
+
+---
+
+### Data Model
+
+**Cassandra (Crawled URLs)**:
+```cql
+CREATE TABLE crawled_urls (
+    url_hash TEXT PRIMARY KEY,  -- SHA-256 of URL
+    url TEXT,
+    crawled_at TIMESTAMP,
+    content_s3_key TEXT,  -- s3://crawl-data/2024/03/15/page123.html
+    status_code INT       -- 200, 404, 500
+);
+```
+
+**S3 (HTML Content)**:
+```
+s3://crawl-data/
+  2024/
+    03/
+      15/
+        page0001.html
+        page0002.html
+        ...
+```
+
+---
+
+### Capacity Estimation
+
+```
+Pages to crawl: 10B
+Crawl rate: 10K pages/sec
+Time to crawl all: 10B / 10K = 1M seconds ≈ 11.5 days (fresh index every 2 weeks)
+
+Storage per page: 100KB (HTML)
+Total storage: 10B × 100KB = 1PB
+
+Bandwidth:
+- Download: 10K pages/sec × 100KB = 1GB/sec
+
+Metadata (Cassandra):
+- 10B URLs × 200 bytes (url_hash + url + metadata) = 2TB
+
+Worker machines:
+- 1 machine = 10 pages/sec
+- 1000 machines = 10K pages/sec ✅
+```
+
+---
+
+### Interview Talking Points
+
+✅ **Mention**:
+- URL frontier (priority queue for fresh vs stale pages)
+- Duplicate detection (Bloom filter or Cassandra)
+- Politeness (rate limit per domain, respect robots.txt)
+- Distributed crawling (partition domains across workers)
+
+❌ **Avoid**:
+- "Crawl everything every day" (impossible, 10B pages × 100KB = 1PB/day)
+- "BFS from seed URLs" (too simplistic, no priority, no politeness)
+
+---
+
+## 4. Design Leaderboard (Real-Time Gaming)
+
+**Requirements**:
+- Track scores for millions of players
+- Get top 100 players globally (real-time)
+- Get player's rank (e.g., "You are rank #45,231")
+- Update scores frequently (every game completion, ~10K updates/sec)
+- Low latency (<50ms for reads)
+
+---
+
+### Architecture
+
+```
+┌────────────┐
+│  Client    │ (Mobile game)
+└──────┬─────┘
+       │
+       ▼
+┌─────────────────┐
+│  API Gateway    │
+└────────┬────────┘
+         │
+    ┌────┼────┐
+    ▼    ▼    ▼
+┌────────────┐ ┌──────────────┐
+│ Leaderboard│ │ User Service │
+│ Service    │ │              │
+└──────┬─────┘ └──────────────┘
+       │
+       ▼
+┌─────────────────┐
+│ Redis Sorted Set│ (In-memory, sorted by score)
+└─────────────────┘
+```
+
+---
+
+### Data Model (Redis Sorted Set)
+
+**Redis** is perfect for leaderboards!
+
+```redis
+# Sorted set: scores are automatically sorted
+ZADD leaderboard:global 1500 "player:123"
+ZADD leaderboard:global 2000 "player:456"
+ZADD leaderboard:global 1800 "player:789"
+
+# Get top 10 players (O(log N + 10))
+ZREVRANGE leaderboard:global 0 9 WITHSCORES
+# Returns:
+# 1. "player:456" (score 2000)
+# 2. "player:789" (score 1800)
+# 3. "player:123" (score 1500)
+
+# Get player's rank (O(log N))
+ZREVRANK leaderboard:global "player:123"
+# Returns: 2 (0-indexed, so rank = 3)
+
+# Get player's score (O(1))
+ZSCORE leaderboard:global "player:123"
+# Returns: 1500
+
+# Update score (O(log N))
+ZINCRBY leaderboard:global 50 "player:123"  # Add 50 points
+# New score: 1550
+```
+
+---
+
+### API Design
+
+```
+POST   /api/v1/scores/update
+       Body: {"player_id": "123", "score": 1500}
+
+GET    /api/v1/leaderboard/top?limit=100
+       Returns: [{"player_id": "456", "score": 2000, "rank": 1}, ...]
+
+GET    /api/v1/leaderboard/rank?player_id=123
+       Returns: {"player_id": "123", "score": 1500, "rank": 3}
+
+GET    /api/v1/leaderboard/nearby?player_id=123&range=10
+       Returns: Players ranked ±10 around player 123
+```
+
+---
+
+### Implementation
+
+```python
+import redis
+
+r = redis.Redis(host='localhost', port=6379)
+
+@app.post('/api/v1/scores/update')
+def update_score(player_id: str, score: int):
+    """Update player's score"""
+    # Update score in Redis sorted set
+    r.zadd('leaderboard:global', {f'player:{player_id}': score})
+    
+    # Also store in MySQL (persistent backup)
+    db.execute(
+        "INSERT INTO scores (player_id, score, updated_at) VALUES (?, ?, NOW()) "
+        "ON DUPLICATE KEY UPDATE score = ?, updated_at = NOW()",
+        (player_id, score, score)
+    )
+    
+    return {"status": "success"}
+
+@app.get('/api/v1/leaderboard/top')
+def get_top_players(limit: int = 100):
+    """Get top N players"""
+    # ZREVRANGE: Get top players (sorted descending by score)
+    results = r.zrevrange('leaderboard:global', 0, limit - 1, withscores=True)
+    
+    return [
+        {
+            "player_id": player_id.decode().split(':')[1],
+            "score": int(score),
+            "rank": idx + 1
+        }
+        for idx, (player_id, score) in enumerate(results)
+    ]
+
+@app.get('/api/v1/leaderboard/rank')
+def get_player_rank(player_id: str):
+    """Get player's rank"""
+    # ZREVRANK: Get rank (0-indexed)
+    rank = r.zrevrank('leaderboard:global', f'player:{player_id}')
+    
+    if rank is None:
+        return {"error": "Player not found"}
+    
+    # ZSCORE: Get score
+    score = r.zscore('leaderboard:global', f'player:{player_id}')
+    
+    return {
+        "player_id": player_id,
+        "score": int(score),
+        "rank": rank + 1  # Convert to 1-indexed
+    }
+
+@app.get('/api/v1/leaderboard/nearby')
+def get_nearby_players(player_id: str, range: int = 10):
+    """Get players ranked near this player"""
+    # Get player's rank
+    rank = r.zrevrank('leaderboard:global', f'player:{player_id}')
+    
+    if rank is None:
+        return {"error": "Player not found"}
+    
+    # Get players in range [rank - 10, rank + 10]
+    start = max(0, rank - range)
+    end = rank + range
+    
+    results = r.zrevrange('leaderboard:global', start, end, withscores=True)
+    
+    return [
+        {
+            "player_id": player_id.decode().split(':')[1],
+            "score": int(score),
+            "rank": start + idx + 1
+        }
+        for idx, (player_id, score) in enumerate(results)
+    ]
+```
+
+---
+
+### Scaling Strategies
+
+#### 1. Sharding (For >10M Players)
+
+**Problem**: Single Redis instance has memory limit (64GB typical)
+
+**Solution**: Shard leaderboard by region or game mode
+
+```
+Global leaderboard → Too big!
+
+Regional leaderboards:
+- leaderboard:us (5M players)
+- leaderboard:eu (3M players)
+- leaderboard:asia (8M players)
+
+Game mode leaderboards:
+- leaderboard:ranked
+- leaderboard:casual
+```
+
+#### 2. Caching Top Players (Reduce Redis Load)
+
+```python
+# Cache top 100 in application memory (refresh every 10 seconds)
+top_100_cache = None
+last_refresh = 0
+
+@app.get('/api/v1/leaderboard/top')
+def get_top_players(limit: int = 100):
+    global top_100_cache, last_refresh
+    
+    if time.time() - last_refresh > 10:
+        # Refresh cache from Redis
+        top_100_cache = r.zrevrange('leaderboard:global', 0, 99, withscores=True)
+        last_refresh = time.time()
+    
+    return format_leaderboard(top_100_cache)
+```
+
+---
+
+### Capacity Estimation
+
+```
+Players: 10M active players
+Leaderboard updates: 10K updates/sec (after each game)
+
+Memory (Redis):
+- 10M players × 100 bytes (player_id + score) = 1GB ✅ Fits in memory!
+
+QPS:
+- Updates: 10K writes/sec
+- Reads (top 100): 100K reads/sec (popular feature)
+- Redis can handle 100K+ QPS easily
+
+Persistence:
+- Redis snapshot every hour → MySQL backup (in case Redis crashes)
+```
+
+---
+
+### Interview Talking Points
+
+✅ **Mention**:
+- Redis Sorted Set (ZADD, ZREVRANGE, ZREVRANK) → O(log N) operations
+- Global vs regional leaderboards (sharding strategy)
+- Cache top 100 (reduce Redis load)
+- MySQL backup (persistence, but reads come from Redis)
+
+❌ **Avoid**:
+- "Sort all players on every request" (too slow, O(N log N))
+- "Use SQL with ORDER BY" (slow for millions of rows)
+
+---
+
+**End of Interview Questions** 📝
