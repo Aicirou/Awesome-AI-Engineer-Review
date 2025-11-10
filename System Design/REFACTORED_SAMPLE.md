@@ -319,6 +319,12 @@ The database selection is one of the most critical architectural decisions. The 
 
 ![image](https://github.com/user-attachments/assets/feecf1b2-efe1-4beb-b9d0-6ee735e9fd29)
 
+**🔍 Image Description - SQL vs NoSQL Architecture Comparison**: This diagram illustrates the fundamental architectural differences between SQL and NoSQL database systems:
+- **Left side (SQL)**: Traditional relational database architecture with structured tables (rows and columns), showing normalized data across multiple related tables with foreign key relationships. Entities like "Users," "Orders," and "Products" are connected through primary-foreign key relationships, emphasizing rigid schema and ACID transaction boundaries.
+- **Right side (NoSQL)**: Document-oriented/key-value store architecture showing denormalized data stored as self-contained JSON/BSON documents. Each document contains all related data (embedded objects), eliminating joins. Illustrates horizontal scalability with data sharded across multiple nodes.
+- **Key visual elements**: Arrows showing write/read patterns, replication flows (synchronous for SQL vs asynchronous for NoSQL), scale-out topology differences (vertical scaling via larger single server vs horizontal scaling via distributed cluster).
+- **Modern context (2024-2025)**: Hybrid approaches like PostgreSQL with JSONB columns, CockroachDB (distributed SQL), YugabyteDB, and MongoDB with ACID transactions blur these boundaries, enabling SQL semantics at NoSQL scale.
+
 ### 💡 NoSQL Advantages
 
 **When NoSQL Excels**:
@@ -534,6 +540,18 @@ Request for key "user:1234" → hash = 67 → lands between C1 and A2 → handle
 
 ![image](https://github.com/user-attachments/assets/b1fcfa70-5e0b-4658-888c-52cec3b60e8a)
 
+**🔍 Image Description**: This diagram depicts a Merkle Tree structure used for efficient replica synchronization in distributed systems. The visualization demonstrates:
+- **Tree structure**: Binary tree with leaf nodes at the bottom representing individual data blocks/key-value pairs (e.g., "Block 0", "Block 1", "Block 2", "Block 3"), each containing a cryptographic hash (SHA-256) of the actual data.
+- **Internal nodes**: Each parent node contains the hash of concatenated child hashes (e.g., Hash(0-1) = SHA256(Hash(0) + Hash(1))), building up the hierarchy level by level.
+- **Root hash**: Single top-level hash representing the entire dataset's fingerprint, enabling O(1) comparison between two replicas to detect any inconsistencies.
+- **Synchronization workflow**: Side-by-side comparison showing two replicas (Node A and Node B) with arrows illustrating the comparison process:
+  1. **Step 1**: Compare root hashes - if identical, datasets match (early exit)
+  2. **Step 2**: If roots differ, recursively compare child subtree hashes to locate divergent branches
+  3. **Step 3**: Drill down to specific differing leaf nodes containing the actual inconsistent data
+  4. **Step 4**: Transfer only the minimal set of differing key-value pairs (highlighted in red/different color)
+- **Efficiency highlight**: Instead of comparing all N data items (O(N) bandwidth), only log(N) hash comparisons needed, with minimal data transfer for repairs. For a 1M-item dataset, this means ~20 hash comparisons vs 1M item comparisons.
+- **Real-world applications**: Used in Cassandra anti-entropy repairs, Bitcoin/blockchain verification, Git commit histories, and Amazon Dynamo replica synchronization (modern implementations use Merkle trees in DynamoDB, Riak, and distributed file systems like IPFS).
+
 ### The Problem
 
 Distributed systems with replicated data need to detect inconsistencies efficiently. Comparing entire datasets is slow and wasteful for large key-value stores.
@@ -676,6 +694,12 @@ The database selection is one of the most critical architectural decisions. The 
 | **Data Model** | Tables with rows | Documents, key-value, graph, column |
 
 ![image](https://github.com/user-attachments/assets/feecf1b2-efe1-4beb-b9d0-6ee735e9fd29)
+
+**🔍 Image Description - SQL vs NoSQL Architecture Comparison**: This diagram illustrates the fundamental architectural differences between SQL and NoSQL database systems:
+- **Left side (SQL)**: Traditional relational database architecture with structured tables (rows and columns), showing normalized data across multiple related tables with foreign key relationships. Entities like "Users," "Orders," and "Products" are connected through primary-foreign key relationships, emphasizing rigid schema and ACID transaction boundaries.
+- **Right side (NoSQL)**: Document-oriented/key-value store architecture showing denormalized data stored as self-contained JSON/BSON documents. Each document contains all related data (embedded objects), eliminating joins. Illustrates horizontal scalability with data sharded across multiple nodes.
+- **Key visual elements**: Arrows showing write/read patterns, replication flows (synchronous for SQL vs asynchronous for NoSQL), scale-out topology differences (vertical scaling via larger single server vs horizontal scaling via distributed cluster).
+- **Modern context (2024-2025)**: Hybrid approaches like PostgreSQL with JSONB columns, CockroachDB (distributed SQL), YugabyteDB, and MongoDB with ACID transactions blur these boundaries, enabling SQL semantics at NoSQL scale.
 
 ### 💡 NoSQL Advantages
 
@@ -1011,6 +1035,14 @@ Cassandra uses Merkle trees for **nodetool repair**:
 
 ![image](https://github.com/user-attachments/assets/a258e1d0-0278-4c5c-8276-dd416f6e4fa4)
 
+**🔍 Image Description - CDN Global Distribution Overview**: This diagram illustrates the high-level CDN architecture showing content distribution from origin to users:
+- **Geographic distribution**: World map visualization showing CDN edge servers (PoPs - Points of Presence) strategically placed across continents (North America, Europe, Asia, South America, Africa, Australia). Each region contains multiple edge server clusters.
+- **User-to-Edge routing**: Arrows showing how users (represented by laptop/mobile icons) connect to their geographically nearest edge server, reducing latency from ~200ms (transcontinental) to ~10-30ms (local).
+- **Edge-to-Origin flow**: Dashed lines showing how edge servers fetch content from the central origin server (located in cloud/data center) on cache miss, then cache it locally for subsequent requests.
+- **Traffic flow pattern**: Solid arrows for user requests (green) and dashed arrows for origin fetches (blue), illustrating the "fan-out" pattern where one origin fetch serves millions of edge requests.
+- **Scale indicators**: Labels showing typical metrics like "50-200 PoPs worldwide" for enterprise CDNs (Cloudflare, Akamai, Fastly), "10-50ms latency to users," and "90-95% cache hit ratio."
+- **Modern CDN features (2024-2025)**: Edge computing annotations showing Cloudflare Workers, AWS Lambda@Edge, and Fastly Compute@Edge enabling serverless functions at CDN edge for dynamic content generation, authentication, and A/B testing without origin round-trips.
+
 ### Why CDN?
 
 **The Problem**: Data-intensive applications face challenges over long distances:
@@ -1035,6 +1067,26 @@ Cassandra uses Merkle trees for **nodetool repair**:
 ## CDN Architecture Components
 
 ![image](https://github.com/user-attachments/assets/33b90165-2d44-44e1-8d0a-72e684fe5168)
+
+**🔍 Image Description - CDN Component Architecture & Data Flow**: This diagram shows the detailed internal architecture of a CDN system with all major components and their interactions:
+- **Client layer**: Multiple client types (web browsers, mobile apps, IoT devices) at the top, representing billions of concurrent users making HTTP/HTTPS requests.
+- **Routing/DNS layer**: GeoDNS and Anycast routing systems directing clients to optimal edge servers based on geographic proximity, server load, and network conditions. Shows DNS resolution flow: Client → GeoDNS → IP of nearest edge server.
+- **Security layer (Scrubber Servers)**: DDoS protection and Web Application Firewall (WAF) filtering malicious traffic before reaching edge servers. Handles volumetric attacks (10-100+ Gbps), protecting both edge and origin infrastructure.
+- **Edge/Proxy server tier**: Thousands of NGINX/Varnish servers distributed globally, each with:
+  - **RAM cache** (hot data, microsecond access, 90%+ hit ratio)
+  - **SSD cache** (warm data, millisecond access)
+  - **Content validation** (ETags, If-Modified-Since headers)
+- **Distribution system**: Content propagation layer between origin and edge servers:
+  - **Push model**: Origin proactively sends content updates to edge servers (used for critical updates, new releases)
+  - **Pull model**: Edge servers fetch content on-demand from origin on first cache miss (used for long-tail content)
+  - **Multicast/P2P protocols**: Efficient distribution for large files (software updates, video segments)
+- **Origin server tier**: Source of truth containing original content. Shows connection pooling, rate limiting to prevent origin overload, and origin shield (intermediate cache layer) reducing origin requests by 70-90%.
+- **Management/Control plane**: Monitoring dashboard showing real-time metrics: cache hit ratio, bandwidth usage, error rates, geographic distribution of requests, and billing/analytics data.
+- **Arrow annotations**: Color-coded data flows showing:
+  - **Green**: Cache hit path (client → edge → response, <50ms total)
+  - **Yellow**: Cache miss path (client → edge → origin → edge → response, 200-500ms)
+  - **Red**: Purge/invalidation commands (management → edge servers, propagates in seconds)
+- **Modern enhancements (2024-2025)**: Edge compute boxes showing serverless function execution at CDN edge (Cloudflare Workers, AWS Lambda@Edge, Deno Deploy), enabling dynamic content generation, API gateways, and real-time personalization without origin server involvement. Also shows HTTP/3 (QUIC) protocol support for 30-50% latency reduction vs HTTP/2.
 
 ### Component Responsibility Table
 
@@ -1438,6 +1490,29 @@ HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
 > **Use Cases**: API protection, DDoS mitigation, resource management | **Complexity**: ⭐⭐⭐⭐☆
 
 ![image](https://github.com/user-attachments/assets/eecc87db-84e4-4e63-a96a-dea8a8479bab)
+
+**🔍 Image Description - Rate Limiter System Architecture**: This diagram shows the complete rate limiting workflow and system architecture:
+- **Request flow path**: Client → API Gateway (with rate limiter middleware) → Backend Services, with rate limiter as the gatekeeper before requests reach application servers.
+- **Rate limiter components**:
+  - **Rules Engine**: Stores rate limit policies (e.g., "100 requests/minute for free tier, 1000 requests/minute for paid tier") with user tier mapping (IP-based, API key-based, user ID-based).
+  - **Redis/Memcached counter store**: Distributed cache holding request counters per user/IP with TTL expiration. Shows key structure like "rate:user:{user_id}:{minute}" with atomic increment operations.
+  - **Token bucket/Sliding window data structures**: Visual representation of token bucket (capacity, refill rate, current tokens) and sliding window log (timestamps of recent requests).
+- **Decision logic flowchart**: 
+  1. Extract identifier (IP, API key, user ID) from request
+  2. Fetch current request count from Redis
+  3. Check against rate limit threshold
+  4. If under limit: Increment counter, forward request (HTTP 200)
+  5. If over limit: Reject request (HTTP 429 Too Many Requests) with "Retry-After" header
+- **Response headers**: Shows standard rate limit headers returned to clients:
+  - `X-RateLimit-Limit: 100` (total quota)
+  - `X-RateLimit-Remaining: 45` (remaining requests)
+  - `X-RateLimit-Reset: 1634567890` (Unix timestamp when quota resets)
+- **Multi-tier architecture**: Shows how rate limiting applies at multiple layers:
+  - **Layer 7 (Application)**: API-specific limits per endpoint (e.g., "/search": 10 req/s, "/upload": 1 req/min)
+  - **Layer 4 (Connection)**: TCP connection rate limiting (prevent SYN floods)
+  - **Layer 3 (Network)**: IP-based blocking for DDoS mitigation
+- **Distributed rate limiting**: Shows synchronization between multiple API Gateway instances using Redis Pub/Sub or centralized counter, ensuring consistent limits across the cluster.
+- **Modern implementations (2024-2025)**: Annotations showing cloud-native solutions like AWS API Gateway throttling, Google Cloud Armor adaptive rate limiting (ML-based), Kong/NGINX rate limit plugins, and Envoy proxy global rate limiting with token bucket algorithm. Also shows emerging patterns like adaptive rate limiting (adjusting limits based on system load) and priority-based queuing (VIP users get higher limits).
 
 ### Why Rate Limiting?
 
