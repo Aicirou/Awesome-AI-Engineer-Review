@@ -26,13 +26,13 @@
 - [x] Key-Value Store - Expand Consistent Hashing with examples
 - [x] Merkle Tree - Add visual workflow and use cases
 
-### Phase 3: CDN & Distributed Systems (Sections 2-6)
-- [ ] CDN - Component breakdown with decision points
-- [ ] Distributed Cache - Memcached vs Redis deep dive
-- [ ] Rate Limiter - Algorithm comparison with pseudocode
-- [ ] Distributed Search - Inverted index step-by-step
-- [ ] Task Scheduler - Failure scenarios
-- [ ] Sharded Counters - Scalability analysis
+### Phase 3: CDN & Distributed Systems (Sections 2-6) ✅ COMPLETED
+- [x] CDN - Component breakdown with decision points
+- [x] Distributed Cache - Memcached vs Redis deep dive
+- [x] Rate Limiter - Algorithm comparison with pseudocode
+- [x] Distributed Search - Inverted index step-by-step
+- [x] Task Scheduler - Failure scenarios
+- [x] Sharded Counters - Scalability analysis
 
 ### Phase 4: Real-World Systems (Sections 7-17)
 For each system (YouTube, Twitter, etc.):

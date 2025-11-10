@@ -1430,3 +1430,1043 @@ HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
 **Migration path**: Start with Redis, move hot data to Memcached if needed
 
 ---
+
+<!-- TOC --><a name="3-rate-limiter"></a>
+# 3. Rate Limiter
+
+> **📌 Quick Summary**: Controls request rate to prevent system overload and abuse  
+> **Use Cases**: API protection, DDoS mitigation, resource management | **Complexity**: ⭐⭐⭐⭐☆
+
+![image](https://github.com/user-attachments/assets/eecc87db-84e4-4e63-a96a-dea8a8479bab)
+
+### Why Rate Limiting?
+
+**Purpose**: Protect system resources from overload and abuse
+- 🛡️ **Prevent abuse**: Block malicious users, bots, DDoS attacks
+- ⚡ **Resource management**: Ensure fair resource allocation across users
+- 💰 **Cost control**: Limit expensive operations (API calls, database queries)
+- 📊 **SLA enforcement**: Implement tiered service levels (free vs paid)
+- 🔄 **Graceful degradation**: Maintain service quality under load
+
+### 🎯 Key Concepts
+
+- **Throttling**: Limiting the rate of requests from a client
+- **Token bucket**: Algorithm storing tokens that replenish over time
+- **Sliding window**: Time-based window that moves continuously
+- **Rate limit**: Maximum requests allowed per time unit (e.g., 100 req/min)
+- **Quota**: Total resource allocation over a period (e.g., 10K API calls/month)
+
+---
+
+## Rate Limiting Algorithms
+
+### 1. Token Bucket Algorithm
+
+> **📌 Most Popular**: Used by Amazon, Stripe, Google Cloud
+
+**How it works**:
+```
+1. Bucket holds tokens (capacity: N)
+2. Tokens added at fixed rate (R tokens/sec)
+3. Each request consumes 1 token
+4. If bucket empty → request rejected
+5. If tokens available → request proceeds, token consumed
+```
+
+**Example**: Bucket capacity = 10, refill rate = 2 tokens/sec
+- User makes 10 requests instantly → all succeed (10 tokens consumed)
+- Next request immediately → rejected (bucket empty)
+- After 5 seconds → 10 more requests possible (10 tokens refilled)
+
+**Characteristics**:
+- ✅ **Burst handling**: Allows temporary spikes up to bucket capacity
+- ✅ **Smooth rate**: Long-term rate controlled by refill rate
+- ✅ **Memory efficient**: O(1) per user
+- ⚠️ **Configuration**: Requires tuning bucket size and refill rate
+
+### 2. Leaky Bucket Algorithm
+
+> **📌 Queue-based**: Processes requests at constant rate
+
+**How it works**:
+```
+1. Requests enter queue (bucket)
+2. Processed at fixed rate (leak rate)
+3. If queue full → request rejected
+4. Otherwise → request queued
+```
+
+**Characteristics**:
+- ✅ **Constant output rate**: Smooth, predictable processing
+- ✅ **Good for batch processing**: Handles bursty traffic gracefully
+- ❌ **No burst allowance**: Cannot process multiple requests simultaneously
+- ❌ **Queuing delay**: Adds latency to requests
+
+**Difference from Token Bucket**:
+- Token bucket: Allows bursts up to capacity
+- Leaky bucket: Enforces strict constant rate
+
+### 3. Fixed Window Counter
+
+> **📌 Simplest**: Easy to implement but has edge case issues
+
+**How it works**:
+```
+1. Time divided into fixed windows (e.g., 1-minute windows)
+2. Counter tracks requests in current window
+3. If counter < limit → allow request, increment counter
+4. If counter >= limit → reject request
+5. Counter resets at window boundary
+```
+
+**Example**: Limit = 100 requests/minute
+- Window 1 (00:00-01:00): 100 requests allowed
+- At 01:00: Counter resets to 0
+- Window 2 (01:00-02:00): 100 requests allowed
+
+**Problem - Boundary Case**:
+```
+00:30-00:59 → 100 requests (allowed)
+01:00-01:29 → 100 requests (allowed)
+Total in 1 minute (00:30-01:30) → 200 requests! (2x limit)
+```
+
+**Characteristics**:
+- ✅ **Simple implementation**: Single counter per user
+- ✅ **Low memory**: O(1) per user
+- ❌ **Boundary burst**: 2x traffic possible at window boundaries
+- ❌ **Unfair**: Users at window start vs end have different experiences
+
+### 4. Sliding Window Log
+
+> **📌 Most Accurate**: Eliminates boundary issues but higher overhead
+
+**How it works**:
+```
+1. Store timestamp of each request in sorted log
+2. For new request at time T:
+   - Remove entries older than (T - window_size)
+   - Count remaining entries
+   - If count < limit → allow request, add timestamp
+   - Otherwise → reject request
+```
+
+**Example**: Limit = 100 requests/minute
+- Request at 12:00:30
+- Check requests between 11:59:30 and 12:00:30
+- If < 100 requests in that range → allow
+
+**Characteristics**:
+- ✅ **Accurate**: No boundary burst issue
+- ✅ **Fair**: True sliding window
+- ❌ **High memory**: O(N) where N = requests in window
+- ❌ **Expensive**: Must scan/delete old entries per request
+
+### 5. Sliding Window Counter (Hybrid)
+
+> **📌 Best Balance**: Combines fixed window efficiency with sliding window accuracy
+
+**How it works**:
+```
+1. Maintain counters for current and previous window
+2. For request at time T in current window:
+   - Calculate overlap with previous window
+   - Estimate: (prev_count × overlap%) + curr_count
+   - If estimate < limit → allow request
+   - Otherwise → reject
+```
+
+**Example**: Limit = 100 req/min, window = 1 minute
+```
+Previous window (00:00-01:00): 80 requests
+Current window (01:00-02:00): 30 requests
+Request at 01:30 (50% into current window):
+  Estimate = 80 × 50% + 30 = 40 + 30 = 70 requests → ALLOW
+```
+
+**Characteristics**:
+- ✅ **Good approximation**: ~99% accurate
+- ✅ **Memory efficient**: O(1) per user (2 counters)
+- ✅ **No boundary burst**: Smooth rate limiting
+- ⚠️ **Slight inaccuracy**: Assumes uniform distribution
+
+---
+
+## Algorithm Comparison Matrix
+
+| Algorithm | Accuracy | Memory | Burst Support | Complexity | Use Case |
+|-----------|----------|--------|---------------|------------|----------|
+| **Token Bucket** | Good | O(1) | ✅ Yes | Medium | API gateways, general purpose |
+| **Leaky Bucket** | Excellent | O(N) | ❌ No | Medium | Message queues, batch processing |
+| **Fixed Window** | Poor | O(1) | ⚠️ At boundaries | Low | Simple rate limiting, non-critical |
+| **Sliding Log** | Excellent | O(N) | ✅ Yes | High | Billing, strict enforcement |
+| **Sliding Counter** | Very Good | O(1) | ✅ Yes | Medium | **Recommended for most cases** |
+
+![image](https://github.com/user-attachments/assets/be78a775-8195-4dfb-8802-3c194be21692)
+
+---
+
+## 💡 Implementation Decisions
+
+### Where to Implement Rate Limiting?
+
+| Location | Pros | Cons | Best For |
+|----------|------|------|----------|
+| **Client-side** | Reduces unnecessary requests | Easily bypassed | Cost savings, UX improvement |
+| **API Gateway** | Centralized, consistent | Single point of failure | Microservices, multi-service |
+| **Application** | Fine-grained control | Must implement everywhere | Specific business logic |
+| **Load Balancer** | Early rejection | Limited context | DDoS protection |
+
+**Recommended**: API Gateway + Application hybrid
+- Gateway: Coarse-grained limits (per IP, per user)
+- Application: Fine-grained limits (per endpoint, per operation)
+
+### Distributed Rate Limiting
+
+**Challenge**: Multiple servers need to share rate limit state
+
+**Solutions**:
+
+1. **Centralized Store (Redis)**
+   ```
+   Key: user:123:requests
+   Value: count
+   TTL: window duration
+   Operations: INCR (atomic), EXPIRE
+   ```
+   - ✅ Consistent across servers
+   - ✅ Atomic operations
+   - ❌ Single point of failure
+   - ❌ Network latency
+
+2. **Sticky Sessions**
+   - Route same user to same server
+   - ✅ No distributed coordination needed
+   - ❌ Uneven load distribution
+   - ❌ Doesn't work with autoscaling
+
+3. **Rate Limiter Service**
+   - Dedicated microservice for rate limiting
+   - ✅ Specialized, optimized
+   - ✅ Can use local cache + sync
+   - ❌ Additional complexity
+
+---
+
+## ⚖️ Trade-offs
+
+**Strict vs Lenient**:
+- **Strict**: Reject at exact limit → Can frustrate legitimate users
+- **Lenient**: Allow slight overage → Better UX but less protection
+
+**Granularity**:
+- **Coarse** (per IP): Simple but can block many users behind NAT
+- **Fine** (per user + endpoint): Accurate but higher overhead
+
+**Response Strategy**:
+- **Reject (429)**: Clear signal, client can retry with backoff
+- **Queue**: Better UX but requires resources, can hide problems
+- **Degrade**: Serve cached/simplified response
+
+---
+
+## 💼 Real-World Examples
+
+| Service | Rate Limits | Algorithm | Notes |
+|---------|-------------|-----------|-------|
+| **Twitter API** | 900 req/15min (user), 450 req/15min (app) | Token bucket | Different limits per endpoint |
+| **GitHub API** | 5000 req/hour (authenticated) | Sliding window | Returns rate limit in headers |
+| **Stripe API** | 100 req/sec | Token bucket | Burst allowed, then throttle |
+| **AWS API Gateway** | 10K req/sec, 5K burst | Token bucket | Configurable per API |
+| **Google Maps API** | Varies by plan | Quota-based | Daily/monthly quotas |
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Not returning rate limit info**
+   - **Problem**: Client doesn't know when to retry
+   - **Solution**: Include headers: `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+
+2. **Same limit for all endpoints**
+   - **Problem**: Expensive operations (video upload) same as cheap (ping)
+   - **Solution**: Different limits per endpoint cost
+
+3. **IP-based limiting with CDN/proxy**
+   - **Problem**: All users appear from same IP
+   - **Solution**: Use `X-Forwarded-For` header, user authentication
+
+4. **Not handling clock skew**
+   - **Problem**: Distributed systems have time differences
+   - **Solution**: Use logical clocks or tolerate small differences
+
+5. **Cascading failures**
+   - **Problem**: Rate limiter down → all requests fail
+   - **Solution**: Fail open (allow requests) with monitoring alerts
+
+---
+
+## 📝 Quick Reference
+
+**One-liner**: Protect systems by controlling request rate per user/IP/endpoint  
+**Default choice**: Sliding window counter (balance of accuracy and efficiency)  
+**Storage**: Redis with atomic operations (INCR, EXPIRE)  
+**Response codes**: 429 Too Many Requests, include Retry-After header  
+**Distributed**: Centralized Redis or rate limiter service with local caching
+
+---
+
+<!-- TOC --><a name="4-distributed-search"></a>
+# 4. Distributed Search
+
+> **📌 Quick Summary**: Horizontally scaled search system using inverted indexes and MapReduce  
+> **Use Cases**: Full-text search, document retrieval, log analysis | **Complexity**: ⭐⭐⭐⭐⭐
+
+### Why Distributed Search?
+
+**Challenge**: Searching billions of documents in milliseconds
+- 📚 **Scale**: TB-PB of data, billions of documents
+- ⚡ **Latency**: Sub-second query response required
+- 🔍 **Complexity**: Boolean queries, phrase matching, fuzzy search
+- 🔄 **Updates**: Real-time indexing of new documents
+
+**Solution**: Distribute indexing and search across multiple nodes
+
+---
+
+<!-- TOC --><a name="41-blob-store"></a>
+## 4.1 Blob Store
+
+> **📌 Quick Summary**: Storage system for large binary objects (images, videos, files)
+
+### Blob Storage Components
+
+| Component | Purpose | Implementation |
+|-----------|---------|----------------|
+| **Blob metadata** | Efficient storage and retrieval metadata | Key-value store (size, type, checksum, creation time) |
+| **Partitioning** | Distribute blobs across data nodes | Consistent hashing, range-based |
+| **Blob indexing** | Efficient blob searching | Inverted index on metadata |
+| **Pagination** | Retrieve limited results | Cursor-based or offset-based |
+| **Replication** | High availability | 3x replication typical (different racks/zones) |
+| **Garbage collection** | Delete without impacting performance | Mark-and-sweep, background process |
+| **Streaming** | Chunk-by-chunk delivery | HTTP range requests, chunked encoding |
+| **Caching** | Improve response time | CDN for hot blobs, local cache for metadata |
+
+### 🎯 Key Design Decisions
+
+**Replication Strategy**:
+- **3x replication**: Balance between availability and storage cost
+- **Placement**: Different racks/zones to handle hardware failures
+- **Consistency**: Eventually consistent (okay for immutable blobs)
+
+**Garbage Collection**:
+- **Mark-and-sweep**: Mark deleted blobs, sweep in background
+- **Compaction**: Reclaim space periodically
+- **Timing**: Off-peak hours to minimize impact
+
+**Streaming**:
+- **Chunking**: 1-10MB chunks typical
+- **Range requests**: Support seeking in videos
+- **Adaptive bitrate**: Multiple resolutions for video
+
+---
+
+<!-- TOC --><a name="42-index"></a>
+## 4.2 Inverted Index
+
+> **📌 Quick Summary**: Core data structure enabling fast full-text search
+
+### What is an Inverted Index?
+
+An **inverted index** is a HashMap-like structure that maps terms to documents (reverse of document-to-terms).
+
+**Forward Index** (document → terms):
+```
+Doc1: "The quick brown fox"
+Doc2: "The lazy dog"
+Doc3: "Quick brown dogs"
+```
+
+**Inverted Index** (term → documents):
+```
+"quick" → [Doc1, Doc3]
+"brown" → [Doc1, Doc3]
+"fox"   → [Doc1]
+"lazy"  → [Doc2]
+"dog"   → [Doc2]
+"dogs"  → [Doc3]
+```
+
+![image](https://github.com/user-attachments/assets/f637f109-db53-442e-ab43-b30386246e5f)
+
+### Building Inverted Index: Step-by-Step
+
+#### Phase 1: Tokenization
+```
+1. Split documents into terms (words)
+2. Normalize: lowercase, remove punctuation
+3. Remove stop words: "the", "is", "at", "which", "on"
+4. Apply stemming: "running" → "run", "dogs" → "dog"
+```
+
+**Example**:
+```
+Input: "The quick BROWN fox is running"
+Tokens: ["quick", "brown", "fox", "running"]
+Stemmed: ["quick", "brown", "fox", "run"]
+```
+
+#### Phase 2: Create Term-Document Matrix
+```
+For each token:
+  - Create entry: term → [doc_id, position]
+  - Store metadata: frequency, document length
+```
+
+**Result**:
+```
+{
+  "quick": [(Doc1, pos=1), (Doc3, pos=0)],
+  "brown": [(Doc1, pos=2), (Doc3, pos=1)],
+  "fox":   [(Doc1, pos=3)],
+  "run":   [(Doc1, pos=5)]
+}
+```
+
+#### Phase 3: Compression & Optimization
+```
+1. Variable-length encoding for doc IDs
+2. Delta encoding for positions
+3. Skip lists for fast intersection
+4. Bloom filters for quick negative lookups
+```
+
+### MapReduce for Inverted Index
+
+> **📌 Distributed index building across cluster**
+
+![image](https://github.com/user-attachments/assets/aec48b4a-8451-4b04-8d9a-3077a272e051)
+
+**Map Phase**:
+```python
+def map(doc_id, content):
+    tokens = tokenize(content)
+    for token in tokens:
+        emit(token, doc_id)
+```
+
+**Shuffle Phase**:
+```
+Group by key (term):
+  "quick" → [Doc1, Doc3, Doc5]
+  "brown" → [Doc1, Doc3, Doc7, Doc9]
+```
+
+**Reduce Phase**:
+```python
+def reduce(term, doc_list):
+    posting_list = sort_and_dedupe(doc_list)
+    emit(term, posting_list)
+```
+
+**Distributed Execution**:
+```
+1. Split documents across N map workers
+2. Each mapper processes chunk, emits (term, doc_id) pairs
+3. Shuffle groups all doc_ids for each term
+4. Reducers create final posting lists
+5. Merge and store in distributed index
+```
+
+---
+
+## Search Query Execution
+
+### Single-Term Query
+```
+Query: "quick"
+1. Lookup "quick" in inverted index
+2. Retrieve posting list: [Doc1, Doc3, Doc5]
+3. Fetch documents, rank, return Top-K
+```
+
+### Boolean AND Query
+```
+Query: "quick AND brown"
+1. Lookup both terms:
+   "quick" → [Doc1, Doc3, Doc5, Doc7]
+   "brown" → [Doc1, Doc3, Doc9]
+2. Intersect posting lists: [Doc1, Doc3]
+3. Return matching documents
+```
+
+**Optimization**: Process shortest list first
+
+### Phrase Query
+```
+Query: "quick brown fox"
+1. Lookup all terms
+2. Check positions are consecutive
+3. "quick" at pos 1, "brown" at pos 2, "fox" at pos 3 → Match!
+```
+
+---
+
+## ⚖️ Advantages vs Disadvantages
+
+### Advantages ✅
+
+1. **Fast full-text search**
+   - O(1) term lookup in hash table
+   - O(K) for Top-K results (K << total docs)
+   - Typical: <100ms for billions of documents
+
+2. **Efficient counting**
+   - Term frequency pre-computed
+   - No need to scan documents at query time
+
+3. **Complex query support**
+   - Boolean operators (AND, OR, NOT)
+   - Phrase queries, proximity searches
+   - Fuzzy matching, wildcards
+
+### Disadvantages ❌
+
+1. **Storage overhead**
+   - Index size: 20-50% of original data
+   - Trade-off: Space for speed
+
+2. **Maintenance cost**
+   - **Insert**: Extract terms, update multiple posting lists
+   - **Update**: Re-index entire document
+   - **Delete**: Mark deleted in posting lists, compact later
+
+3. **Freshness challenge**
+   - Batch indexing: Minutes to hours delay
+   - Real-time indexing: More expensive, complex
+
+---
+
+## 💡 Distributed Search Architecture
+
+### Index Sharding Strategies
+
+#### 1. Document Partitioning (Horizontal)
+```
+Shard 1: Documents 1-1M
+Shard 2: Documents 1M-2M
+Shard 3: Documents 2M-3M
+```
+
+**Query execution**:
+- Scatter: Query all shards in parallel
+- Gather: Merge and rank results
+
+✅ **Pros**: Balanced storage, simple
+❌ **Cons**: Query touches all shards
+
+#### 2. Term Partitioning (Vertical)
+```
+Shard 1: Terms A-F
+Shard 2: Terms G-M
+Shard 3: Terms N-Z
+```
+
+**Query execution**:
+- Query only relevant shards for query terms
+- Merge posting lists
+
+✅ **Pros**: Fewer shards touched per query
+❌ **Cons**: Load imbalance (common terms hot)
+
+**Recommendation**: Document partitioning for most use cases
+
+---
+
+## 💼 Real-World Examples
+
+| System | Scale | Strategy | Notes |
+|--------|-------|----------|-------|
+| **Elasticsearch** | Billions of docs | Document sharding | Distributed, RESTful search |
+| **Apache Solr** | Petabytes | Document sharding | Built on Lucene |
+| **Google Search** | Trillions of pages | Multi-tier indexing | Real-time index + full index |
+| **Twitter Search** | 1 trillion tweets | Time-based sharding | 15-second indexing latency |
+| **Amazon Product Search** | Billions of products | Hybrid partitioning | Real-time updates critical |
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Not tuning tokenization**
+   - **Problem**: Poor relevance, missed matches
+   - **Solution**: Language-specific analyzers, custom tokenizers
+
+2. **Ignoring relevance scoring**
+   - **Problem**: Documents returned in arbitrary order
+   - **Solution**: TF-IDF, BM25, or learning-to-rank
+
+3. **Single-threaded indexing**
+   - **Problem**: Slow index updates
+   - **Solution**: Parallel indexing, MapReduce
+
+4. **No real-time requirements**
+   - **Problem**: Batch indexing causes stale results
+   - **Solution**: Dual index (real-time + batch)
+
+---
+
+## 📝 Quick Reference
+
+**One-liner**: Term-to-document mapping enabling O(1) search lookup  
+**Storage overhead**: 20-50% of original data size  
+**Query latency**: <100ms typical for billions of documents  
+**Sharding strategy**: Document partitioning for balanced load  
+**Popular implementations**: Elasticsearch, Solr (Lucene), Algolia
+
+---
+
+<!-- TOC --><a name="5-distributed-task-scheduler"></a>
+# 5. Distributed Task Scheduler
+
+> **📌 Quick Summary**: Reliable execution of periodic and delayed tasks across distributed systems  
+> **Use Cases**: Cron jobs, background processing, workflow orchestration | **Complexity**: ⭐⭐⭐⭐⭐
+
+![image](https://github.com/user-attachments/assets/5de17b3e-0048-4481-8507-1391d2e2e749)
+
+### Why Distributed Task Scheduler?
+
+**Purpose**: Execute tasks reliably at scale
+- ⏰ **Scheduled tasks**: Cron jobs, periodic reports, data cleanup
+- 🔄 **Delayed execution**: Rate limiting, retry logic, reminders
+- 📊 **Batch processing**: ETL jobs, data aggregation, backups
+- 🎯 **Guaranteed execution**: At-least-once or exactly-once semantics
+- 📈 **Scalability**: Handle millions of tasks across thousands of workers
+
+### 🎯 Key Concepts
+
+- **Task**: Unit of work to be executed (function + parameters)
+- **Schedule**: When to execute (cron expression, delay, timestamp)
+- **Worker**: Node that executes tasks
+- **Task queue**: Persistent storage of pending tasks
+- **Coordinator**: Assigns tasks to workers, handles failures
+- **Idempotency**: Task can be safely executed multiple times
+
+---
+
+## Core Components
+
+### 1. Task Queue
+**Purpose**: Store pending tasks persistently
+- **Implementation**: Kafka, RabbitMQ, Redis, database
+- **Priority queues**: High-priority tasks executed first
+- **Partitioning**: Distribute tasks across multiple queues
+
+### 2. Scheduler Service
+**Purpose**: Determine when tasks should run
+- **Cron parsing**: Convert `0 0 * * *` to execution times
+- **Delay calculation**: Future timestamp for delayed tasks
+- **Trigger generation**: Create task instances at scheduled times
+
+### 3. Worker Pool
+**Purpose**: Execute tasks in parallel
+- **Horizontal scaling**: Add workers to increase capacity
+- **Specialization**: Different worker types for different tasks
+- **Resource limits**: CPU, memory, timeout per task
+
+### 4. Coordinator/Master
+**Purpose**: Orchestrate task distribution
+- **Task assignment**: Route tasks to appropriate workers
+- **Health monitoring**: Track worker status, handle failures
+- **Load balancing**: Distribute work evenly
+- **Consistency**: Use ZooKeeper or etcd for coordination
+
+### 5. Result Store
+**Purpose**: Track task execution status
+- **States**: Pending, Running, Completed, Failed
+- **Retry tracking**: Attempt count, last error
+- **Audit log**: Execution history for debugging
+
+---
+
+## Task Scheduling Patterns
+
+### 1. Cron-Style Periodic Tasks
+```
+Pattern: "0 0 * * *" (daily at midnight)
+Use case: Daily reports, backup jobs
+
+Implementation:
+1. Scheduler generates next execution time
+2. Creates task instance at scheduled time
+3. Worker executes, scheduler computes next run
+```
+
+### 2. Delayed Tasks
+```
+Pattern: Execute after 5 minutes
+Use case: Reminder notifications, rate limiting
+
+Implementation:
+1. Store task with future timestamp
+2. Scheduler polls for ready tasks
+3. Dispatch to workers when timestamp reached
+```
+
+### 3. Dependent Tasks (DAG)
+```
+Pattern: Task B runs after Task A completes
+Use case: ETL pipelines, workflows
+
+Implementation:
+1. Store task dependencies as DAG
+2. Execute tasks in topological order
+3. Wait for dependencies before scheduling
+```
+
+### 4. One-Time Tasks
+```
+Pattern: Execute once, now or at specific time
+Use case: User-triggered actions, webhooks
+
+Implementation:
+1. Enqueue task immediately
+2. Mark as one-time (no rescheduling)
+3. Delete after execution
+```
+
+---
+
+## 💡 Design Decisions
+
+### At-Least-Once vs Exactly-Once
+
+**At-Least-Once**:
+- ✅ **Simple**: Retry on failure
+- ⚠️ **Requirement**: Tasks must be idempotent
+- **Implementation**: Ack after execution, retry on timeout
+
+**Exactly-Once**:
+- ✅ **Correctness**: No duplicate executions
+- ❌ **Complex**: Distributed transactions, deduplication
+- **Implementation**: Unique task ID, store execution state before running
+
+**Recommendation**: At-least-once + idempotent tasks (simpler, performant)
+
+### Failure Handling
+
+| Failure Type | Detection | Mitigation |
+|--------------|-----------|------------|
+| **Worker crash** | Heartbeat timeout | Reassign task to different worker |
+| **Task timeout** | Execution timer | Kill task, retry on another worker |
+| **Coordinator failure** | Leader election | Standby takes over via Raft/Paxos |
+| **Task failure** | Exception caught | Exponential backoff retry |
+| **Network partition** | Health checks | Wait for partition to heal, use quorum |
+
+### Retry Strategy
+
+**Exponential Backoff**:
+```
+Attempt 1: Immediate
+Attempt 2: Wait 1 second
+Attempt 3: Wait 2 seconds
+Attempt 4: Wait 4 seconds
+Attempt 5: Wait 8 seconds
+Max attempts: 5, then dead-letter queue
+```
+
+**Jitter**: Add randomness to avoid thundering herd
+```python
+delay = base_delay * (2 ** attempt) + random(0, jitter)
+```
+
+---
+
+## ⚖️ Trade-offs
+
+**Centralized Coordinator**:
+- ✅ **Pros**: Simple, consistent view
+- ❌ **Cons**: Single point of failure, scaling bottleneck
+- **Solution**: Leader election with standby replicas
+
+**Distributed Coordination**:
+- ✅ **Pros**: No SPOF, highly scalable
+- ❌ **Cons**: Complex, eventual consistency challenges
+- **Solution**: Use consensus algorithms (Raft, Paxos)
+
+**Push vs Pull**:
+- **Push**: Coordinator assigns tasks to workers
+  - ✅ Better load balancing
+  - ❌ Coordinator must track worker state
+- **Pull**: Workers request tasks from queue
+  - ✅ Self-healing, simpler
+  - ❌ Potential idle time between polls
+
+---
+
+## 💼 Real-World Examples
+
+| System | Scale | Use Case | Technology |
+|--------|-------|----------|------------|
+| **Apache Airflow** | 1000s of DAGs | ETL pipelines, data workflows | Python, PostgreSQL |
+| **Celery** | Millions of tasks/day | Async task queue for Python | RabbitMQ, Redis |
+| **Quartz** | Enterprise scale | Java job scheduling | JDBC, clustering |
+| **Kubernetes CronJob** | Container orchestration | Scheduled batch jobs | etcd, containers |
+| **AWS Step Functions** | Serverless | Workflow orchestration | Managed service |
+| **Temporal** | Millions of workflows | Durable execution | Cassandra/MySQL |
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Non-idempotent tasks**
+   - **Problem**: Duplicate executions cause corruption
+   - **Solution**: Design tasks to be safely retried
+
+2. **No dead-letter queue**
+   - **Problem**: Failed tasks lost forever
+   - **Solution**: Move failed tasks to DLQ after max retries
+
+3. **Unbounded queues**
+   - **Problem**: Memory exhaustion, task starvation
+   - **Solution**: Queue size limits, backpressure
+
+4. **Single coordinator**
+   - **Problem**: SPOF, scaling limit
+   - **Solution**: Leader election, standby replicas
+
+5. **Ignoring task dependencies**
+   - **Problem**: Tasks execute in wrong order
+   - **Solution**: DAG representation, topological sort
+
+---
+
+## 📝 Quick Reference
+
+**One-liner**: Reliable execution of scheduled/delayed tasks across distributed workers  
+**Default choice**: At-least-once execution with idempotent tasks  
+**Coordinator**: Use leader election (ZooKeeper, etcd, Raft)  
+**Queue**: Kafka for high throughput, Redis for simplicity  
+**Retry**: Exponential backoff with jitter, max 5 attempts  
+**Popular**: Airflow (workflows), Celery (Python), Temporal (durable execution)
+
+---
+
+<!-- TOC --><a name="6-sharded-counters"></a>
+# 6. Sharded Counters
+
+> **📌 Quick Summary**: Distributed counter system to handle high-frequency increments  
+> **Use Cases**: View counts, likes, real-time analytics | **Complexity**: ⭐⭐⭐⭐☆
+
+![image](https://github.com/user-attachments/assets/0d3f9fff-271a-4693-a6d2-138add59b885)
+
+### Why Sharded Counters?
+
+**Problem**: Single counter becomes bottleneck
+- 🔥 **Hot key**: One counter receives millions of increments/sec
+- 🔒 **Contention**: Lock/transaction conflicts degrade performance
+- 📉 **Latency**: Write amplification as traffic increases
+
+**Solution**: Split counter across multiple shards, aggregate on read
+
+---
+
+## How Sharded Counters Work
+
+### Architecture
+
+```
+Counter "video:12345:views" with 10 shards:
+
+Shard 0: counter = 1,234
+Shard 1: counter = 1,189
+Shard 2: counter = 1,305
+...
+Shard 9: counter = 1,276
+
+Total = Sum of all shards = 12,500
+```
+
+### Operations
+
+**Increment (Write)**:
+```python
+def increment(counter_id, value=1):
+    shard_id = hash(counter_id + random()) % num_shards
+    atomic_increment(f"{counter_id}:shard:{shard_id}", value)
+```
+
+**Read (Get Total)**:
+```python
+def get_count(counter_id):
+    total = 0
+    for shard_id in range(num_shards):
+        total += get(f"{counter_id}:shard:{shard_id}")
+    return total
+```
+
+---
+
+## 🎯 Key Design Decisions
+
+### Number of Shards
+
+**Trade-off**: More shards = higher write throughput but slower reads
+
+| Shards | Write Throughput | Read Latency | Use Case |
+|--------|------------------|--------------|----------|
+| **1** | 10K writes/sec | 1ms | Low traffic |
+| **10** | 100K writes/sec | 10ms | Moderate traffic |
+| **100** | 1M writes/sec | 100ms | High traffic |
+| **1000** | 10M writes/sec | 1s | Extreme traffic |
+
+**Formula**: `num_shards = expected_writes_per_sec / 10K`
+
+**Dynamic Sharding**: Start with 10, increase if bottleneck detected
+
+### Shard Selection
+
+**Random Distribution**:
+```python
+shard_id = random.randint(0, num_shards - 1)
+```
+- ✅ Even distribution
+- ✅ No coordination needed
+- ⚠️ Non-deterministic
+
+**Hash-Based**:
+```python
+shard_id = hash(user_id + counter_id) % num_shards
+```
+- ✅ Deterministic (same user → same shard)
+- ⚠️ Potential hotspots if user is very active
+
+**Recommendation**: Random for better load distribution
+
+---
+
+## ⚖️ Read Optimization Strategies
+
+### 1. Periodic Aggregation
+```
+Background job every 5 minutes:
+- Sum all shards
+- Store result in "counter:total" key
+- Serve reads from cached total
+
+Trade-off: Stale data (up to 5 min old)
+```
+
+### 2. Approximate Counts
+```
+Sample subset of shards:
+- Read 10% of shards
+- Multiply by 10
+
+Trade-off: ±10% accuracy for 90% faster reads
+```
+
+### 3. Lazy Aggregation
+```
+On read:
+- Check if cached total exists and is fresh
+- If yes, return cached value
+- If no, aggregate shards, cache for 30 seconds
+
+Trade-off: First read slow, subsequent reads fast
+```
+
+### 4. Read Replicas
+```
+Replicate aggregated total to read replicas:
+- Periodic sync from primary
+- Reads served from replicas
+
+Trade-off: Infrastructure cost, eventual consistency
+```
+
+---
+
+## 💼 Real-World Examples
+
+| Platform | Counter Type | Shards | Update Frequency |
+|----------|--------------|--------|------------------|
+| **YouTube** | Video views | 100-1000 | Real-time |
+| **Twitter** | Tweet likes | 50-100 | Sub-second |
+| **Reddit** | Post upvotes | 10-50 | Real-time |
+| **Instagram** | Post likes | 100-500 | Real-time |
+| **LinkedIn** | Profile views | 20-50 | Near real-time |
+
+---
+
+## Implementation Example: Redis
+
+```python
+import redis
+import random
+
+class ShardedCounter:
+    def __init__(self, redis_client, num_shards=10):
+        self.redis = redis_client
+        self.num_shards = num_shards
+    
+    def increment(self, counter_id, value=1):
+        shard_id = random.randint(0, self.num_shards - 1)
+        key = f"{counter_id}:shard:{shard_id}"
+        self.redis.incrby(key, value)
+    
+    def get_count(self, counter_id):
+        total = 0
+        for shard_id in range(self.num_shards):
+            key = f"{counter_id}:shard:{shard_id}"
+            count = self.redis.get(key) or 0
+            total += int(count)
+        return total
+    
+    def get_approximate(self, counter_id, sample_size=3):
+        """Sample subset of shards for faster reads"""
+        total = 0
+        for _ in range(sample_size):
+            shard_id = random.randint(0, self.num_shards - 1)
+            key = f"{counter_id}:shard:{shard_id}"
+            count = self.redis.get(key) or 0
+            total += int(count)
+        # Extrapolate from sample
+        return int(total * (self.num_shards / sample_size))
+```
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Too few shards**
+   - **Problem**: Still have write contention
+   - **Solution**: Monitor latency, increase shards dynamically
+
+2. **Too many shards**
+   - **Problem**: Slow reads, high storage overhead
+   - **Solution**: Use aggregation strategies
+
+3. **No caching on reads**
+   - **Problem**: Every read scans all shards
+   - **Solution**: Cache aggregated value with TTL
+
+4. **Not handling shard failures**
+   - **Problem**: Missing counts if shard unavailable
+   - **Solution**: Replicate shards, return partial result if needed
+
+5. **Exact counts when approximate is sufficient**
+   - **Problem**: Unnecessary read latency
+   - **Solution**: Use approximate reads for non-critical display
+
+---
+
+## 📝 Quick Reference
+
+**One-liner**: Split high-traffic counter across shards to eliminate write bottleneck  
+**Optimal shards**: 10-100 for most use cases  
+**Read optimization**: Cache aggregated total with 30-60s TTL  
+**Accuracy**: Exact for writes, approximate acceptable for reads (views, likes)  
+**Implementation**: Redis INCRBY with random shard selection  
+**When to use**: >10K increments/sec on single counter
+
+---
