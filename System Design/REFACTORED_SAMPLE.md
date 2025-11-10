@@ -68,6 +68,132 @@
 
 ---
 
+## 📋 SDE-II Interview Cheat Sheet
+
+> **Last-minute review** - Memorize these before your interview!
+
+### Capacity Numbers (Memorize These!)
+
+| Metric | Small | Medium | Large | Massive |
+|--------|-------|--------|-------|---------|
+| **QPS** | 1K | 10K | 100K | 1M+ |
+| **DAU** | 1M | 10M | 100M | 1B+ |
+| **Data** | 100GB | 1TB | 10TB | 1PB+ |
+| **Latency Target** | <1s | <500ms | <100ms | <50ms |
+
+### Power of 2 Table (Quick Reference)
+
+| Power | Exact Value | Approx | Name |
+|-------|-------------|--------|------|
+| 2^10 | 1,024 | ~1K | KB |
+| 2^20 | 1,048,576 | ~1M | MB |
+| 2^30 | 1,073,741,824 | ~1B | GB |
+| 2^40 | ~1.1 trillion | ~1T | TB |
+
+### Latency Numbers (2025 Updated)
+
+| Operation | Latency | Example |
+|-----------|---------|---------|
+| L1 cache | 0.5 ns | CPU register |
+| L2 cache | 7 ns | On-chip cache |
+| RAM | 100 ns | Main memory |
+| SSD read | 150 μs | Local disk |
+| Network (same datacenter) | 500 μs | Server-to-server |
+| HDD seek | 10 ms | Spinning disk |
+| Network (cross-region) | 150 ms | US → Europe |
+
+### Technology Selection Quick Guide
+
+**Database:**
+- SQL: Need ACID transactions (banking, e-commerce checkout)
+- NoSQL: High scale (>100K QPS) + simple queries (social media, logs)
+
+**Cache:**
+- Redis: Need data structures (sorted sets, lists), persistence
+- Memcached: Simple key-value, pure in-memory
+
+**Load Balancer:**
+- Round Robin: Stateless services, equal server capacity
+- Least Connections: Long-lived connections (WebSocket, DB)
+
+**Rate Limiter:**
+- Token Bucket: Allow bursts (APIs with occasional spikes)
+- Leaky Bucket: Smooth traffic (video streaming, payment processing)
+
+**Message Queue:**
+- Use if: Async processing, decoupling services, traffic smoothing
+- Skip if: Synchronous user-facing response needed
+
+### Common System Design Patterns
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| **Consistent Hashing** | Distributed cache/storage | Memcached, Cassandra |
+| **Bloom Filter** | Fast existence check | URL deduplication, weak password check |
+| **Circuit Breaker** | Prevent cascading failures | Service mesh, API Gateway |
+| **CQRS** | Read/write at different scales | Twitter (write 10K TPS, read 300K TPS) |
+| **Event Sourcing** | Audit trail, time travel | Banking transactions, order history |
+| **Saga** | Distributed transactions | E-commerce checkout (payment + inventory + shipping) |
+
+### CAP Theorem Quick Decision
+
+**Need strong consistency?** (Banking, inventory)
+- Choose CP: MongoDB, HBase, Redis Sentinel
+- Sacrifice: Availability during network partition
+
+**Need high availability?** (Social media, analytics)
+- Choose AP: Cassandra, DynamoDB, CouchDB
+- Sacrifice: Temporary inconsistency (eventual consistency)
+
+### Interview Red Flags to Avoid ❌
+
+1. **"Use microservices"** → Start monolith, split when needed
+2. **"Use NoSQL for everything"** → SQL is default, NoSQL when >100K QPS
+3. **"Use Kubernetes"** → Overkill for <10K users, consider Heroku/EC2
+4. **"Blockchain for audit trail"** → Merkle trees provide integrity without overhead
+5. **"Real-time ML inference"** → Pre-compute recommendations offline
+6. **"Cache everything"** → Cache hot data (80/20 rule), measure hit ratio
+7. **"Shard database immediately"** → Try read replicas + vertical scaling first
+
+### Interview Answer Framework (RADIO)
+
+**R**equirements (5 min):
+- Functional: Core features (post, like, comment)
+- Non-functional: Scale (DAU, QPS), latency (<100ms), availability (99.9%)
+
+**A**PI Design (5 min):
+- REST endpoints: POST /api/v1/posts, GET /api/v1/feed
+- Request/response format
+
+**D**ata Model (10 min):
+- SQL schema or NoSQL structure
+- Indexes on query columns
+- Sharding strategy
+
+**I**nfrastructure (15 min):
+- Draw boxes: LB → App Servers → DB → Cache → CDN
+- Explain data flow
+
+**O**ptimizations (10 min):
+- Bottlenecks: Database at 10K QPS? → Add read replicas
+- Caching: What to cache? → Hot user data, feed top 20 posts
+- CDN: Static assets, images, videos
+
+### Final Checklist Before Interview ✅
+
+- [ ] Practiced 5+ system design questions with timer (45 min each)
+- [ ] Can draw load balancer, database, cache, CDN in every diagram
+- [ ] Know when to use SQL vs NoSQL (default SQL, NoSQL >100K QPS)
+- [ ] Can calculate QPS, storage, bandwidth (back-of-envelope)
+- [ ] Memorized latency numbers (RAM 100ns, SSD 150μs, Network 500μs)
+- [ ] Practiced explaining trade-offs (consistency vs availability)
+- [ ] Know 3 real-world examples (Instagram shards PostgreSQL, Netflix uses Cassandra)
+- [ ] Can discuss monitoring (metrics, logs, traces)
+- [ ] Ready to acknowledge assumptions ("Assuming 80/20 read/write ratio...")
+- [ ] Prepared follow-up answers (What if traffic 10x? What if database fails?)
+
+---
+
 # 1. Concepts
 
 > **📌 Section Overview**: Fundamental building blocks of modern distributed systems - from communication protocols to data storage and fault tolerance.
