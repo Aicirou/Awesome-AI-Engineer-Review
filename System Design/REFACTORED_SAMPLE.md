@@ -2470,3 +2470,1794 @@ class ShardedCounter:
 **When to use**: >10K increments/sec on single counter
 
 ---
+
+<!-- TOC --><a name="7-youtube"></a>
+# 7. YouTube - Video Streaming Platform
+
+> **📌 Quick Summary**: Large-scale video sharing platform with encoding, storage, and CDN delivery  
+> **Scale**: 2B+ users, 500hrs uploaded/min, 1B+ hours watched daily | **Complexity**: ⭐⭐⭐⭐⭐
+
+![image](https://github.com/user-attachments/assets/cdd2be4a-a2b6-4cf8-8f17-e753afd0ad9d)
+
+### System Requirements
+
+**Functional**:
+- ✅ Upload videos (multiple formats, up to 256GB)
+- ✅ Stream videos with adaptive bitrate
+- ✅ Search videos by title, description, tags
+- ✅ Like, comment, subscribe functionality
+- ✅ Generate and serve thumbnails
+
+**Non-Functional**:
+- ⚡ **Latency**: <200ms for video start (CDN), <2s for upload processing
+- 📈 **Scalability**: Handle billions of daily views
+- 🔒 **Availability**: 99.9% uptime for streaming
+- 📊 **Consistency**: Eventual consistency acceptable (view counts, likes)
+- 💾 **Storage**: Petabytes of video data
+
+---
+
+## High-Level Architecture
+
+### Upload Flow
+
+```
+1. User uploads video → Load Balancer
+2. Web Server receives video → Store in Upload Storage (temporary)
+3. Metadata saved to Database (MySQL)
+4. Video handed to Encoder Queue
+5. Encoder + Transcoder process video:
+   - Compress video
+   - Generate multiple resolutions (2160p, 1440p, 1080p, 720p, 480p, 360p)
+   - Extract audio tracks
+   - Generate thumbnails
+6. Processed videos stored in Blob Storage (GFS/S3)
+7. Popular videos pushed to CDN
+8. User notified of successful upload
+```
+
+### Streaming Flow
+
+```
+1. User requests video → DNS resolves to nearest CDN
+2. CDN cache hit → Serve directly (1-5ms)
+3. CDN cache miss → Fetch from Blob Storage → Cache → Serve
+4. Analytics: Track views, watch time, engagement
+```
+
+![image](https://github.com/user-attachments/assets/34180cb8-fefd-40b0-8d0a-48944237cd43)
+
+---
+
+## Component Breakdown
+
+| Component | Responsibility | Technology | Scale |
+|-----------|----------------|------------|-------|
+| **Load Balancers** | Distribute user requests | NGINX, HAProxy | 100s of instances |
+| **Web Servers** | Handle API requests | Node.js, Go | 1000s of instances |
+| **Application Servers** | Business logic, video processing orchestration | Java, Python | 1000s of instances |
+| **User Database** | User accounts, subscriptions, preferences | MySQL (sharded) | 100TB+ |
+| **Video Metadata DB** | Video info, descriptions, tags, stats | MySQL (sharded) | 500TB+ |
+| **Bigtable** | Thumbnails storage (key-value) | Bigtable, Cassandra | Petabytes |
+| **Upload Storage** | Temporary video storage | Distributed FS | 100TB+ |
+| **Encoders** | Video compression, transcoding | FFmpeg, custom | 10,000s of workers |
+| **Blob Storage** | Permanent video storage | GFS, S3, Colossus | 1+ Exabyte |
+| **CDN** | Edge caching for popular content | Akamai, Cloudflare, custom | 1000s of PoPs |
+| **Colocation Sites** | Regional caching (not full CDN) | Custom | 100s worldwide |
+| **Search Index** | Video search by metadata | Elasticsearch | 100TB+ |
+| **Analytics System** | View counts, engagement metrics | BigQuery, Kafka | Petabytes/day |
+
+---
+
+## 🎯 Key Design Decisions
+
+### 1. Why Bigtable for Thumbnails?
+
+**Requirements**:
+- Each video has 4-10 thumbnails (different timestamps)
+- Thumbnails are small (<100KB each)
+- High read throughput (displayed in search results, recommendations)
+- Billions of thumbnails total
+
+**Bigtable characteristics**:
+- ✅ Optimized for small objects (<10MB)
+- ✅ High throughput for key-value lookups
+- ✅ Horizontal scalability
+- ✅ Lower cost than blob storage for small files
+
+**Key structure**: `video_id:thumbnail_number` → image bytes
+
+### 2. Separate User and Video Metadata Storage
+
+**Why decoupled?**
+- **Different scale**: Videos grow faster than users
+- **Different access patterns**: 
+  - User data: Strong consistency needed (authentication, subscriptions)
+  - Video metadata: Eventual consistency acceptable (views, likes)
+- **Different optimization**: 
+  - User DB: ACID transactions, normalized
+  - Video metadata: Denormalized for read performance
+
+### 3. Multi-Tier Video Storage
+
+**Three tiers**:
+
+| Tier | Content | Storage | Access Latency |
+|------|---------|---------|----------------|
+| **CDN (Edge)** | Viral/trending videos (top 5%) | RAM/SSD | 1-5ms |
+| **Colocation** | Moderately popular (next 15%) | SSD/HDD | 10-50ms |
+| **Origin (Blob)** | Long-tail content (80%) | HDD/Tape | 100-500ms |
+
+**Benefits**:
+- Cost optimization (most videos rarely watched)
+- Low latency for popular content
+- Scalable storage for massive archive
+
+---
+
+## Video Encoding Pipeline
+
+### Multi-Resolution Encoding
+
+**Why multiple resolutions?**
+- 📱 Different devices (mobile, tablet, TV, 4K displays)
+- 🌐 Different network speeds (4G, WiFi, fiber)
+- 💰 Bandwidth cost optimization
+
+**Resolution ladder**:
+```
+2160p (4K):  3840×2160, 35-45 Mbps  (< 5% of views)
+1440p (2K):  2560×1440, 16-24 Mbps  (< 10% of views)
+1080p (FHD): 1920×1080, 8-12 Mbps   (~30% of views)
+720p (HD):   1280×720,  5-7 Mbps    (~35% of views)
+480p (SD):   854×480,   2-3 Mbps    (~15% of views)
+360p:        640×360,   1-2 Mbps    (~5% of views)
+```
+
+### Adaptive Bitrate Streaming (ABR)
+
+**How it works**:
+1. Video split into 5-10 second chunks
+2. Each chunk available in all resolutions
+3. Player measures bandwidth
+4. Dynamically switches resolution per chunk
+5. Smooth playback, no buffering
+
+**Protocol**: HLS (HTTP Live Streaming) or DASH (Dynamic Adaptive Streaming)
+
+**Example**:
+```
+Good WiFi (10 Mbps)    → Stream 1080p chunks
+Network drops (3 Mbps) → Switch to 480p chunks
+Recovers (8 Mbps)      → Resume 720p chunks
+```
+
+---
+
+## ⚖️ Trade-offs Analysis
+
+### Consistency vs Availability
+
+**Design Choice**: Prefer availability and low latency over strong consistency
+
+**Acceptable inconsistencies**:
+- ❌ **View counts**: May differ across regions (eventually consistent)
+- ❌ **Like counts**: Updates propagate within seconds
+- ❌ **New video visibility**: Subscribers may see at different times
+- ✅ **User authentication**: Strong consistency required
+- ✅ **Payment data**: ACID transactions required
+
+**Why acceptable?**
+- Video consumption is read-heavy (100:1 read:write ratio)
+- Exact counts not critical for user experience
+- CAP theorem: Choose AP over CP for video metadata
+
+### Distributed Cache Strategy
+
+**Choice**: Memcached over Redis for video metadata
+
+**Reasoning**:
+| Factor | Memcached | Redis | Winner |
+|--------|-----------|-------|--------|
+| **Throughput** | 1M+ ops/sec | 100K ops/sec | Memcached |
+| **Data structure** | Simple objects | Complex types | Memcached (don't need) |
+| **Persistence** | No | Yes | Memcached (cache not source) |
+| **LRU eviction** | Built-in | Yes | Tie |
+| **Memory efficiency** | High | Moderate | Memcached |
+
+**Cache layers**:
+1. **Browser cache**: Video chunks (30 min TTL)
+2. **CDN cache**: Popular videos (24 hrs)
+3. **Application cache**: Metadata (5 min TTL)
+4. **Database cache**: Query results (1 min TTL)
+
+### MySQL vs NoSQL for Different Data
+
+**MySQL for User Data**:
+- ✅ Strong consistency (authentication, subscriptions)
+- ✅ ACID transactions (payment, account changes)
+- ✅ Complex queries (user analytics)
+- ✅ Structured schema (well-defined user attributes)
+- Scale: Vertical + sharding by user_id
+
+**NoSQL (Bigtable) for Thumbnails**:
+- ✅ Horizontal scalability (billions of thumbnails)
+- ✅ High throughput (key-value lookups)
+- ✅ Cost-effective (commodity hardware)
+- ✅ Simple access pattern (get by video_id)
+
+**Blob Storage for Videos**:
+- ✅ Optimized for large files (GB-sized videos)
+- ✅ Petabyte+ scale
+- ✅ Integration with CDN
+- ✅ Cost-effective for cold storage
+
+![image](https://github.com/user-attachments/assets/bfdff910-3eec-4158-a205-24eea8b51b96)
+
+---
+
+## Scalability Techniques
+
+### 1. Database Sharding
+
+**User Database**: Shard by `user_id % 1000` (1000 shards)
+- Each shard: 2M users, ~100GB data
+- Allows independent scaling per shard
+
+**Video Metadata**: Shard by `video_id % 10000` (10,000 shards)
+- Each shard: 500K videos, ~50GB metadata
+- Hot videos may span multiple shards (replicas)
+
+### 2. Asynchronous Processing
+
+**Upload pipeline**:
+```
+Synchronous:
+- Receive video (upload)
+- Store temporarily
+- Return success to user immediately
+
+Asynchronous (background):
+- Encode video (5-30 minutes depending on length)
+- Generate thumbnails (1-2 minutes)
+- Extract metadata (tags, captions)
+- Populate search index
+- Update recommendation system
+```
+
+**Benefits**:
+- User doesn't wait for encoding
+- Can batch/schedule encoding jobs
+- Retry failures independently
+
+### 3. Content Popularity Prediction
+
+**Machine Learning model predicts**:
+- Which videos will go viral (pre-cache to CDN)
+- Which old videos trending (move from cold → hot storage)
+- Regional popularity (cache in specific geos)
+
+**Signals**:
+- Upload channel popularity (subscriber count)
+- Initial engagement (likes/views in first hour)
+- Social media mentions
+- Search trends
+
+---
+
+## 💼 Real-World Architecture Evolution
+
+### YouTube's Storage Journey
+
+**2005-2010**: MySQL + Local storage
+- Single data center
+- Manual replication
+- ~500K videos
+
+**2010-2015**: MySQL sharding + GFS (Google File System)
+- Multiple data centers
+- Automatic failover
+- ~100M videos
+
+**2015-2020**: Bigtable + Colossus (next-gen GFS)
+- Global distribution
+- Multi-region writes
+- ~500M videos
+
+**2020-Present**: Spanner (NewSQL) + Cloud CDN
+- Strong consistency with global scale
+- Auto-scaling
+- ~800M+ videos
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Single encoding pipeline**
+   - **Problem**: Bottleneck during viral upload spikes
+   - **Solution**: Horizontal scaling with job queues (Kafka)
+
+2. **No CDN for all content**
+   - **Problem**: Origin servers overwhelmed
+   - **Solution**: Multi-tier caching (CDN + Colocation + Origin)
+
+3. **Synchronous video processing**
+   - **Problem**: User waits 10+ minutes for upload
+   - **Solution**: Asynchronous with notification
+
+4. **Ignoring long-tail distribution**
+   - **Problem**: Cache all videos = high cost
+   - **Solution**: Adaptive caching based on popularity
+
+5. **No adaptive bitrate**
+   - **Problem**: Buffering on slow networks
+   - **Solution**: HLS/DASH with multiple resolutions
+
+---
+
+## 📝 Quick Reference
+
+**Scale**: 2B users, 500hrs uploaded/min, 1B hrs watched daily  
+**Storage**: 1+ Exabyte of video data  
+**Encoding**: 10,000+ parallel workers, 5-30 min per video  
+**CDN**: 1000+ PoPs worldwide, 95%+ cache hit ratio  
+**Database**: MySQL (users) + Bigtable (thumbnails) + Blob (videos)  
+**Consistency**: Eventual for views/likes, strong for auth/payments  
+**Key insight**: Content popularity follows power law (5% videos = 95% traffic)
+
+---
+
+<!-- TOC --><a name="8-quora"></a>
+# 8. Quora - Q&A Platform
+
+> **📌 Quick Summary**: Knowledge-sharing platform with ML-powered recommendations and ranking  
+> **Scale**: 300M+ monthly users, 400M+ questions, real-time content | **Complexity**: ⭐⭐⭐⭐☆
+
+![image](https://github.com/user-attachments/assets/c5b8ad91-5008-46e4-b699-7fef5c446e8b)
+
+### System Requirements
+
+**Functional**:
+- ✅ Ask questions, provide answers
+- ✅ Upvote/downvote answers
+- ✅ Comment on answers
+- ✅ Follow topics, users, questions
+- ✅ Personalized feed with recommendations
+- ✅ Real-time notifications
+
+**Non-Functional**:
+- ⚡ **Read latency**: <100ms for feed, <50ms for cached content
+- 📈 **Write latency**: <500ms for posts, async for notifications
+- 🔒 **Consistency**: Strong for core data (questions, answers), eventual for counts
+- 📊 **Availability**: 99.95% uptime
+- 🤖 **ML inference**: <200ms for ranking/recommendations
+
+---
+
+## Component Breakdown
+
+| Component | Responsibility | Technology | Purpose |
+|-----------|----------------|------------|---------|
+| **Load Balancers** | Traffic distribution | HAProxy, NGINX | Handle millions of concurrent users |
+| **Web Servers** | API endpoints | Python (Django) | Serve HTTP requests |
+| **App Servers** | Business logic | Python, Java | Question/answer processing |
+| **MySQL** | Critical data | MySQL (sharded) | Questions, answers, comments, votes |
+| **HBase (NoSQL)** | Analytics data | HBase, Cassandra | View counts, scores, extracted features |
+| **Blob Storage** | Media files | S3, GCS | Images, videos in posts |
+| **Memcached** | Hot data cache | Memcached | Frequently accessed critical data |
+| **Redis** | Online counters | Redis | Real-time view counts (INCR) |
+| **CDN** | Static content | Cloudflare | Images, videos, CSS, JS |
+| **Compute Cluster** | ML/Ranking | Spark, TensorFlow | Recommendations, answer ranking |
+| **Kafka** | Event streaming | Apache Kafka | Async tasks, notifications, analytics |
+| **Search Engine** | Full-text search | Elasticsearch | Question/answer search |
+
+![image](https://github.com/user-attachments/assets/f0db48d7-31a8-4d82-8053-92c3a8f7d62b)
+
+---
+
+## 🎯 Key Design Decisions
+
+### 1. MySQL vs HBase: Data Segregation
+
+**MySQL for Critical Data** (Strong Consistency):
+- Questions, answers, comments (immutable after creation)
+- Upvotes, downvotes (transactional updates)
+- User profiles, followers
+- **Why**: Need ACID, complex queries (joins), strong consistency
+- **Scale**: Sharded by `question_id` and `user_id`
+
+**HBase for Analytics Data** (Eventually Consistent):
+- View counts (millions of updates/day)
+- Answer scores (recomputed periodically)
+- ML feature vectors (precomputed, updated batch)
+- **Why**: High write throughput, horizontal scaling, BigTable-like interface
+- **Scale**: Handles billions of writes/day
+
+**Benefits of separation**:
+- MySQL not overwhelmed by high-frequency writes
+- HBase optimized for time-series analytics
+- Independent scaling of OLTP vs OLAP workloads
+
+### 2. Dual Cache Strategy: Memcached + Redis
+
+**Memcached** (General Caching):
+```python
+# Frequently accessed questions/answers from MySQL
+cache_key = f"question:{question_id}"
+cached_data = memcached.get(cache_key)
+if cached_data:
+    return cached_data
+else:
+    data = mysql.query(f"SELECT * FROM questions WHERE id={question_id}")
+    memcached.set(cache_key, data, ttl=600)  # 10 min
+    return data
+```
+
+**Redis** (Online View Counter):
+```python
+# Real-time view count with in-memory increment
+def record_view(answer_id):
+    redis.incr(f"answer:views:{answer_id}")
+
+def get_view_count(answer_id):
+    return redis.get(f"answer:views:{answer_id}") or 0
+
+# Periodically sync to HBase
+def sync_to_hbase():
+    for key in redis.keys("answer:views:*"):
+        answer_id = extract_id(key)
+        count = redis.get(key)
+        hbase.put(answer_id, "stats:views", count)
+        redis.delete(key)  # Clear after sync
+```
+
+**Why Redis for counters?**
+- ✅ Atomic INCR operation (no race conditions)
+- ✅ Sub-millisecond latency
+- ✅ Persistence options (RDB/AOF) for durability
+- ✅ Supports complex operations (INCRBY, EXPIRE)
+
+**Why not use MySQL for view counts?**
+- ❌ Too many writes (1M+ increments/sec)
+- ❌ Lock contention on hot rows
+- ❌ Disk I/O bottleneck
+
+### 3. Compute Servers for ML Features
+
+**Purpose**: Recommendation and ranking system
+
+**Features extracted** (stored in HBase):
+- User engagement history (topics read, answers upvoted)
+- Question quality score (grammar, completeness, topic relevance)
+- Answer quality score (length, upvotes, author expertise)
+- Topic vectors (embeddings for similarity)
+
+**ML Models**:
+1. **Answer Ranking**:
+   - Inputs: Answer quality, user preferences, recency
+   - Output: Ranked list of answers for a question
+   - Latency: <200ms (real-time inference)
+
+2. **Feed Recommendations**:
+   - Inputs: User history, trending topics, collaborative filtering
+   - Output: Personalized question feed
+   - Computation: Batch (updated hourly) + real-time adjustments
+
+3. **Topic Suggestions**:
+   - Inputs: Question text, historical tagging
+   - Output: Relevant topics to follow
+   - Computation: Offline (recomputed daily)
+
+**Why separate compute cluster?**
+- ML models need high RAM (feature vectors, model weights)
+- GPU acceleration for deep learning models
+- Independent scaling from application servers
+
+---
+
+## Asynchronous Task Processing
+
+![image](https://github.com/user-attachments/assets/0695a93b-ee0b-4399-b1c9-79613dacc3fa)
+
+### Kafka-Based Event Architecture
+
+**Problem**: Some tasks don't need immediate execution
+- View count aggregation (not urgent)
+- Email notifications (can be delayed seconds)
+- Analytics processing (batch overnight)
+- Topic highlighting (updated hourly)
+
+**Solution**: Decouple urgent from non-urgent tasks
+
+```
+User Action → API Server → Kafka Topics:
+                           ├── view_counter_topic → Cron Job (aggregate views)
+                           ├── notification_topic → Notification Service
+                           ├── analytics_topic → Analytics Pipeline
+                           └── trending_topic → Trending Detector
+```
+
+**Benefits**:
+- ✅ API servers respond faster (no waiting for secondary tasks)
+- ✅ Tasks can retry independently on failure
+- ✅ Horizontal scaling of task workers
+- ✅ Backpressure handling (queue absorbs spikes)
+
+**Example Flow**:
+```
+1. User views answer
+2. API server responds immediately (50ms)
+3. Event published to Kafka: {user_id, answer_id, timestamp}
+4. View counter service increments Redis (async)
+5. Analytics service logs to HBase (async)
+6. Notification service alerts answer author (async, batched)
+```
+
+---
+
+## Real-Time Updates: Long Polling
+
+![image](https://github.com/user-attachments/assets/23702cfb-22d2-4d48-a705-bca788384b80)
+
+### Why Not Simple Polling?
+
+**Simple Polling** (client requests every 5 seconds):
+```
+Client → Server: "Any new comments?"
+Server → Client: "No"  (wasted request)
+... 5 seconds later ...
+Client → Server: "Any new comments?"
+Server → Client: "No"  (wasted request)
+```
+
+**Problems**:
+- 🔥 Server overload (millions of empty requests)
+- 🔋 Battery drain on mobile
+- ⚡ High latency (up to 5 seconds for new content)
+
+### Long Polling Solution
+
+```
+1. Client requests: "Any new comments on answer 123?"
+2. Server holds connection (doesn't respond immediately)
+3. If update within 60 seconds → respond immediately
+4. If no update after 60 seconds → respond "no update"
+5. Client immediately makes new long poll request
+```
+
+**Benefits**:
+- ✅ Real-time feel (<1s latency for new content)
+- ✅ Reduces requests by 90%+
+- ✅ Server can batch notifications
+
+**Implementation**:
+```python
+@app.route('/poll/comments/<answer_id>')
+def long_poll_comments(answer_id):
+    timeout = 60  # seconds
+    start_time = time.time()
+    last_comment_id = request.args.get('last_id')
+    
+    while time.time() - start_time < timeout:
+        new_comments = get_comments_since(answer_id, last_comment_id)
+        if new_comments:
+            return jsonify(new_comments)
+        time.sleep(1)  # Check every second
+    
+    return jsonify([])  # No updates
+```
+
+**Why not WebSockets?**
+- ❌ More complex (persistent connections)
+- ❌ Harder to scale (connection state management)
+- ❌ Firewall/proxy issues
+- ✅ Long polling works everywhere (HTTP)
+
+---
+
+## ⚖️ Trade-offs Analysis
+
+### Strong vs Eventual Consistency
+
+| Data Type | Consistency Level | Reasoning |
+|-----------|------------------|-----------|
+| **Questions/Answers** | Strong (MySQL) | Core content must be immediately visible to all |
+| **Upvotes/Downvotes** | Strong (MySQL) | Prevent double-voting, maintain integrity |
+| **View counts** | Eventual (Redis→HBase) | Exact count not critical, high write volume |
+| **Answer ranking** | Eventual (batch recompute) | Rankings updated hourly, not real-time |
+| **Notifications** | Eventual (Kafka) | Delay of seconds acceptable |
+
+### Cache Invalidation Strategy
+
+**Write-through** (Critical Data):
+```python
+def update_answer(answer_id, new_text):
+    # 1. Update database
+    mysql.update(f"UPDATE answers SET text='{new_text}' WHERE id={answer_id}")
+    # 2. Invalidate cache
+    memcached.delete(f"answer:{answer_id}")
+    # Next read will fetch fresh data from DB
+```
+
+**Write-behind** (Analytics):
+```python
+def increment_view_count(answer_id):
+    # 1. Update Redis immediately
+    redis.incr(f"answer:views:{answer_id}")
+    # 2. Async sync to HBase (background job)
+```
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Using MySQL for high-frequency counters**
+   - **Problem**: Lock contention, slow updates
+   - **Solution**: Redis for real-time counts, sync to HBase
+
+2. **Synchronous ML inference in API path**
+   - **Problem**: Ranking delays response (200ms+ added)
+   - **Solution**: Pre-compute rankings, cache results
+
+3. **No separation of OLTP and OLAP**
+   - **Problem**: Analytics queries slow down transactional queries
+   - **Solution**: MySQL for OLTP, HBase for OLAP
+
+4. **Simple polling for updates**
+   - **Problem**: Server overload, high latency
+   - **Solution**: Long polling or Server-Sent Events
+
+5. **Not using CDN for media**
+   - **Problem**: Origin servers serve all images
+   - **Solution**: CDN for images/videos in questions/answers
+
+---
+
+## 📝 Quick Reference
+
+**Scale**: 300M users, 400M questions, 1B+ answers  
+**Database**: MySQL (core) + HBase (analytics) hybrid  
+**Cache**: Memcached (general) + Redis (counters) dual strategy  
+**Async**: Kafka for non-urgent tasks (views, notifications, analytics)  
+**Real-time**: Long polling for comments/votes (60s timeout)  
+**ML**: Separate compute cluster for ranking/recommendations  
+**Key insight**: Separate read-heavy (questions) from write-heavy (counters) workloads
+
+---
+
+<!-- TOC --><a name="9-google-map"></a>
+# 9. Google Maps - Navigation & Location Services
+
+> **📌 Quick Summary**: Real-time routing, traffic prediction, and location search at global scale  
+> **Scale**: 1B+ users, 220+ countries, 25M+ updates/day | **Complexity**: ⭐⭐⭐⭐⭐
+
+![image](https://github.com/user-attachments/assets/8cd295ae-e8eb-4784-abe6-93632629208e)
+
+### System Requirements
+
+**Functional**:
+- ✅ Find shortest path between two locations
+- ✅ Real-time traffic updates
+- ✅ ETA prediction with current conditions
+- ✅ Search places (businesses, landmarks)
+- ✅ Turn-by-turn navigation
+- ✅ Multi-modal routing (driving, transit, walking, biking)
+
+**Non-Functional**:
+- ⚡ **Routing latency**: <500ms for path calculation
+- 📈 **Scalability**: Millions of concurrent route requests
+- 🎯 **Accuracy**: 95%+ ETA accuracy, <1% routing errors
+- 🔄 **Real-time**: Traffic updates every 1-5 minutes
+- 🌍 **Global**: 220+ countries, 40M+ km of roads
+
+---
+
+## High-Level Architecture
+
+![image](https://github.com/user-attachments/assets/37d09a35-828b-43f8-b0f6-cd3eca4aaa6f)
+
+### Core Components
+
+| Component | Responsibility | Technology | Scale |
+|-----------|----------------|------------|-------|
+| **Segment Database** | Road network graph | Distributed DB | 100M+ segments |
+| **Segment Adder** | Add new road segments | Microservice | Batch updates |
+| **Server Allocator** | Assign segments to servers | Load balancer | 10,000+ servers |
+| **Key-Value Store** | Segment → Server mapping | Redis, Bigtable | 100M+ entries |
+| **Graph Processing** | Path calculation | Custom C++ | 10,000+ cores |
+| **Location Service** | Lat/Long resolution | Distributed search | Billions of queries |
+| **Pub-Sub System** | Real-time location streams | Kafka, Pub/Sub | 25M updates/day |
+| **Analytics Engine** | Traffic prediction | Spark, ML models | Petabytes/day |
+| **Map Tile Server** | Render map images | Custom renderer | CDN-backed |
+
+---
+
+## 🎯 Segment-Based Architecture
+
+### Why Segments?
+
+**Problem**: Can't fit entire world road network on one server
+- 40M km of roads
+- Billions of intersection nodes
+- Graph too large for single-server memory
+
+**Solution**: Divide map into geographic segments
+
+### Segment Design
+
+**Segment properties**:
+```json
+{
+  "segment_id": "seg_12345",
+  "boundary": {
+    "north": 37.8,
+    "south": 37.7,
+    "east": -122.3,
+    "west": -122.4
+  },
+  "graph": {
+    "nodes": [...],  // Intersections within segment
+    "edges": [...]   // Roads within segment
+  },
+  "border_nodes": [...]  // Connections to adjacent segments
+}
+```
+
+**Size**: Typically 10km × 10km (varies by road density)
+- Urban areas: Smaller segments (more roads)
+- Rural areas: Larger segments (fewer roads)
+
+---
+
+## Add Segment Workflow
+
+```
+1. New segment data arrives (from mapping team)
+   - Boundary coordinates (lat/long)
+   - Road network graph
+
+2. Segment Adder processes:
+   - Validate segment data
+   - Generate unique segment_id (UUID)
+
+3. Server Allocator assigns segment:
+   - Find server with capacity
+   - Load segment graph onto server
+   - Return server_id
+
+4. Store mapping in Key-Value Store:
+   - Key: segment_id
+   - Value: {server_id, boundary_coords}
+
+5. Update index for lat/long lookups:
+   - Geohash index for fast segment discovery
+```
+
+---
+
+## Routing Request Flow
+
+![image](https://github.com/user-attachments/assets/d043a28a-df21-4468-9d19-4e5ba7de6d37)
+
+### Step-by-Step
+
+```
+1. User provides: Source (lat1, long1) → Destination (lat2, long2)
+
+2. Location Service resolves coordinates:
+   - Find which segment contains (lat1, long1) → segment_A
+   - Find which segment contains (lat2, long2) → segment_B
+
+3. Graph Processing Service:
+   a. Query Key-Value Store:
+      - segment_A → server_X
+      - segment_B → server_Y
+   
+   b. If same segment (segment_A == segment_B):
+      - Connect to server_X
+      - Run Dijkstra/A* within single segment
+      - Return path
+   
+   c. If different segments:
+      - Connect to both server_X and server_Y
+      - Find border nodes connecting segments
+      - Run multi-segment path algorithm (described below)
+      - Stitch path together
+      - Return complete route
+
+4. ETA Calculation:
+   - Apply current traffic conditions
+   - ML model predicts future traffic
+   - Return distance, time, route polyline
+```
+
+### Multi-Segment Routing
+
+**Challenge**: Source and destination in different segments
+
+**Solution**: Hierarchical routing
+```
+1. Within segment_A:
+   - Find path from source to all border nodes
+   - Border node A1 is closest exit
+
+2. Between segments (high-level graph):
+   - Segment graph: Each segment is one node
+   - Border connections are edges
+   - Run Dijkstra on segment graph: A → B → C → ... → Z
+   - Finds optimal segment sequence
+
+3. Within segment_Z:
+   - Find path from border entry to destination
+
+4. Combine paths:
+   - Source → A1 (within A)
+   - A1 → B1 → ... → Z1 (cross-segment)
+   - Z1 → Destination (within Z)
+```
+
+**Optimization**: Precompute shortest paths between all border nodes within each segment (done offline)
+
+---
+
+## Real-Time Traffic Integration
+
+### Data Collection
+
+**Sources**:
+1. **GPS probes**: Anonymized location data from Android phones
+   - 25M+ location updates per day
+   - Speed, heading, timestamp
+2. **Traffic sensors**: Government-installed sensors
+3. **Historical patterns**: Past traffic data for time-of-day predictions
+
+### Architecture
+
+```
+Mobile Devices → Pub-Sub System (Kafka) → Data Analytics Engine (Spark)
+                                            ↓
+                                      ML Models:
+                                      - Current traffic speed
+                                      - Congestion detection
+                                      - Future traffic prediction (15-60 min ahead)
+                                            ↓
+                                      Traffic Database
+                                            ↓
+                                      Graph Processing (applies traffic to routing)
+```
+
+### Traffic Processing Pipeline
+
+```python
+# Pseudo-code
+def process_location_stream(location_event):
+    # 1. Aggregate locations to road segments
+    segment_id = map_to_segment(location_event.lat, location_event.lng)
+    road_id = snap_to_road(location_event)
+    
+    # 2. Calculate speed
+    speed = location_event.speed  # km/h
+    
+    # 3. Update segment traffic
+    update_traffic(segment_id, road_id, speed, timestamp)
+    
+    # 4. Detect anomalies
+    if speed < expected_speed * 0.5:
+        alert_traffic_jam(segment_id, road_id)
+
+# Batch processing (every 5 minutes)
+def update_segment_weights():
+    for segment in all_segments:
+        for road in segment.roads:
+            avg_speed = get_avg_speed(road, last_5_min)
+            travel_time = road.length / avg_speed
+            update_edge_weight(road, travel_time)  # Used in routing
+```
+
+### ML-Based Traffic Prediction
+
+**Features**:
+- Historical traffic patterns (same day of week, same time)
+- Current traffic speed
+- Special events (concerts, sports, holidays)
+- Weather conditions
+
+**Model**: LSTM (Long Short-Term Memory) neural network
+- Input: Traffic speeds for last 30 minutes
+- Output: Predicted speeds for next 60 minutes
+- Accuracy: 85-90% for 15-min ahead, 70-75% for 60-min ahead
+
+**Impact on ETA**:
+- Static route (no traffic): 30 min
+- With current traffic: 42 min
+- With predicted traffic: 45 min (accounts for worsening conditions)
+
+---
+
+## ⚖️ Trade-offs Analysis
+
+### Segment Size
+
+| Size | Pros | Cons | Use Case |
+|------|------|------|----------|
+| **Small (1km × 1km)** | Precise routing, balanced load | More segments, more cross-segment routing | Dense urban (NYC, Tokyo) |
+| **Medium (10km × 10km)** | Good balance | - | Suburban areas |
+| **Large (50km × 50km)** | Fewer segments, less overhead | Hot segments in cities, unbalanced load | Rural areas |
+
+**Dynamic sizing**: Urban = smaller, Rural = larger
+
+### Routing Algorithm Choice
+
+**Dijkstra**:
+- ✅ Guarantees shortest path
+- ❌ Explores many unnecessary nodes
+- **Use**: Short distances (<50km)
+
+**A* (A-Star)**:
+- ✅ Faster than Dijkstra (heuristic guides search)
+- ✅ Still guarantees shortest path
+- **Use**: Medium distances (50-500km)
+
+**Contraction Hierarchies** (Google's choice):
+- ✅ 1000x faster than Dijkstra
+- ✅ Preprocessing creates highway hierarchy
+- ⚠️ Requires periodic rebuild (when roads change)
+- **Use**: Long distances (>500km), production systems
+
+**How Contraction Hierarchies work**:
+```
+Preprocessing (offline, done once):
+1. Identify "highway" nodes (major roads)
+2. Contract graph: Shortcut paths through minor roads
+3. Create hierarchy: Local roads → Arterials → Highways → Freeways
+
+Query time (online):
+1. Shortest path from source to nearest highway
+2. Fast routing on highway network (smaller graph)
+3. Shortest path from highway to destination
+Result: 1000x faster, still optimal path
+```
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Single-server routing**
+   - **Problem**: Can't fit world map in memory
+   - **Solution**: Segment-based distribution
+
+2. **Static routing (no traffic)**
+   - **Problem**: Inaccurate ETAs, frustrated users
+   - **Solution**: Real-time traffic integration
+
+3. **No path precomputation**
+   - **Problem**: Slow queries (>10s for long routes)
+   - **Solution**: Contraction hierarchies, border node precomputation
+
+4. **Ignoring mobile battery**
+   - **Problem**: Constant GPS drains battery
+   - **Solution**: Adaptive sampling (1s when navigating, 5min when idle)
+
+5. **Not handling edge cases**
+   - **Problem**: Routing through closed roads, wrong-way streets
+   - **Solution**: Road metadata (one-way, restrictions, closures)
+
+---
+
+## 📝 Quick Reference
+
+**Scale**: 1B users, 220 countries, 40M km roads  
+**Segments**: 10M+ geographic segments, 100K-1M roads each  
+**Routing**: Contraction Hierarchies (1000x faster than Dijkstra)  
+**Traffic**: 25M location updates/day, 5-min refresh rate  
+**Latency**: <500ms for path calculation, <100ms for segment lookup  
+**Accuracy**: 95% ETA accuracy with ML traffic prediction  
+**Key insight**: Segment-based distribution + hierarchical routing = global scale
+
+---
+
+<!-- TOC --><a name="10-yelp"></a>
+# 10. Yelp - Location-Based Business Search
+
+> **📌 Quick Summary**: Place discovery using dynamic QuadTree segments with proximity search  
+> **Scale**: 200M+ reviews, 100M+ places, <100ms search latency | **Complexity**: ⭐⭐⭐⭐☆
+
+![image](https://github.com/user-attachments/assets/7a121032-5b3b-4d47-8f78-7940cb912c9d)
+
+### System Requirements
+
+**Functional**:
+- ✅ Search nearby places by category (restaurants, hotels, etc.)
+- ✅ View business details (ratings, reviews, photos)
+- ✅ Filter by distance, rating, price
+- ✅ Add/update business information
+- ✅ Real-time updates as user moves
+
+**Non-Functional**:
+- ⚡ **Search latency**: <100ms for nearby search
+- 🎯 **Accuracy**: Return all relevant places within radius
+- 📈 **Scalability**: Handle millions of concurrent searches
+- 🔄 **Real-time**: Reflect new businesses within minutes
+- 🌍 **Global**: 35+ countries, 100M+ places
+
+---
+
+## 🎯 The Core Challenge: Dynamic Segments
+
+### Problem: Fixed-Size Segments Don't Work
+
+**Why not fixed grids?**
+```
+Manhattan (NYC): 10,000 restaurants per km²
+Rural Montana:   5 restaurants per 100 km²
+```
+
+**Issues with fixed-size**:
+- ❌ Urban areas: Too many places per segment (millions) → slow search
+- ❌ Rural areas: Too few places per segment (5-10) → many empty segments
+- ❌ Uneven load distribution → some servers overwhelmed, others idle
+
+### Solution: Dynamic QuadTree Segmentation
+
+**Key idea**: Split segments when they exceed a place count threshold
+
+**Algorithm**:
+```
+1. Start with entire map as one segment (root node)
+
+2. For each segment:
+   - Count places in segment
+   - If count > 500 → Split into 4 child segments (NW, NE, SW, SE)
+   - If count ≤ 500 → Keep as leaf node
+
+3. Result: Leaf nodes = actual searchable segments
+   - Each leaf has ≤500 places
+   - Smaller segments in dense areas
+   - Larger segments in sparse areas
+```
+
+**Example**:
+```
+San Francisco (dense):
+- Root segment has 50,000 restaurants
+- Split into 4 → each has ~12,500
+- Split again → each has ~3,125
+- Split again → each has ~780
+- Split again → each has ~195 ✓ (below 500 limit)
+Result: Small segments (~1km × 1km)
+
+Rural Wyoming (sparse):
+- Root segment has 200 restaurants
+- No split needed ✓ (below 500 limit)
+Result: Large segment (100km × 100km)
+```
+
+---
+
+## QuadTree Structure
+
+### Tree Representation
+
+```
+                    Root (50,000 places)
+                   /      |      |      \
+           NW (12,500)  NE (13,000)  SW (12,000)  SE (12,500)
+           /  |  |  \
+      NW(3K) NE(3K) SW(3K) SE(3K)
+      ... continues splitting until ≤500 places per leaf
+```
+
+### Node Data Structure
+
+**Internal Node** (has children):
+```json
+{
+  "node_id": "internal_123",
+  "boundary": {
+    "north": 37.8,
+    "south": 37.7,
+    "east": -122.3,
+    "west": -122.4
+  },
+  "place_count": 3200,
+  "children": [
+    "child_nw_id",
+    "child_ne_id",
+    "child_sw_id",
+    "child_se_id"
+  ]
+}
+```
+
+**Leaf Node** (actual segment):
+```json
+{
+  "node_id": "leaf_456",
+  "boundary": {...},
+  "place_count": 450,
+  "places": [
+    {"place_id": "p1", "name": "Restaurant A", "lat": 37.75, "lng": -122.35},
+    {"place_id": "p2", "name": "Cafe B", "lat": 37.76, "lng": -122.36},
+    ...
+  ],
+  "neighbors": {
+    "north": "leaf_457",
+    "south": "leaf_458",
+    "east": "leaf_459",
+    "west": "leaf_460"
+  }
+}
+```
+
+---
+
+## Search Workflow
+
+### Step-by-Step Process
+
+```
+User query: "Restaurants within 5km of (37.7749, -122.4194)"
+
+1. Find containing segment:
+   - Start at root
+   - Check which child contains (37.7749, -122.4194)
+   - Traverse to child: NW quadrant
+   - Repeat until reaching leaf node
+   - Result: leaf_456 (contains user location)
+   - Time: O(log N) where N = total segments
+
+2. Get places from current segment:
+   - Retrieve leaf_456.places
+   - Calculate distance for each place:
+     distance = haversine(user_lat, user_lng, place_lat, place_lng)
+   - Filter places within 5km
+   - Result: 120 restaurants
+
+3. Check if need neighboring segments:
+   - User is 1km from segment boundary
+   - Search radius is 5km
+   - Need to check neighbors? Yes (radius > distance to boundary)
+
+4. Expand to neighboring segments:
+   - Use doubly-linked list to find neighbors
+   - leaf_456.neighbors → [leaf_457, leaf_458, leaf_459, leaf_460]
+   - Fetch places from neighbor segments
+   - Filter by 5km radius
+   - Result: Additional 40 restaurants from neighbors
+
+5. Aggregate and rank:
+   - Total: 160 restaurants within 5km
+   - Apply filters (rating > 4.0, open now, category = "Italian")
+   - Result: 25 matching restaurants
+   - Rank by: distance, rating, popularity
+   - Return: Top 10 results
+```
+
+### Time Complexity
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| **Find leaf segment** | O(log N) | Tree depth ~8-12 levels |
+| **Fetch places in segment** | O(1) | Direct lookup, max 500 places |
+| **Distance calculation** | O(M) | M = places in segment + neighbors (~2000 max) |
+| **Ranking** | O(M log M) | Sort by distance + rating |
+| **Total per query** | O(log N + M log M) | Typically <50ms |
+
+---
+
+## Neighbor Connections: Doubly-Linked Lists
+
+### Why Neighbors Matter
+
+**Problem**: Search radius may cross segment boundaries
+```
+User location: Center of Segment A
+Search radius: 5km
+Segment size: 2km × 2km
+
+Result: Must search Segment A + 8 neighboring segments
+```
+
+### How Doubly-Linked Lists Work
+
+**Structure**: All siblings at same tree level connected
+```
+     Parent
+    /  |  |  \
+  NW←→NE←→SW←→SE  (doubly-linked list)
+```
+
+**Benefits**:
+- ✅ **Fast neighbor lookup**: O(1) instead of tree traversal
+- ✅ **Easy expansion**: Move forward/backward through list
+- ✅ **Flexible radius**: Add neighbors incrementally until radius satisfied
+
+**Example**:
+```python
+def find_neighbors(current_segment, depth=1):
+    neighbors = []
+    
+    # Primary neighbors (share edge)
+    neighbors.extend([
+        current_segment.north,
+        current_segment.south,
+        current_segment.east,
+        current_segment.west
+    ])
+    
+    if depth > 1:
+        # Secondary neighbors (diagonal)
+        neighbors.extend([
+            current_segment.north.east,  # NE
+            current_segment.north.west,  # NW
+            current_segment.south.east,  # SE
+            current_segment.south.west   # SW
+        ])
+    
+    return neighbors
+```
+
+---
+
+## ⚖️ Trade-offs Analysis
+
+### QuadTree vs Alternatives
+
+| Approach | Pros | Cons | Best For |
+|----------|------|------|----------|
+| **QuadTree** | Adaptive sizing, balanced load | Complex implementation, tree updates | Yelp (varied density) |
+| **Geohash** | Simple encoding, string prefix | Fixed grid, uneven at boundaries | Caching (Redis geospatial) |
+| **S2 Geometry** | Precise coverage, no gaps | Heavy math, overkill for simple search | Google Maps (routing) |
+| **Fixed Grid** | Simplest implementation | Poor for varied density | Small regions only |
+
+### QuadTree Parameters
+
+**Place limit per segment (500 in Yelp's case)**:
+
+| Limit | Segment Size (Urban) | Search Time | Tree Depth | Update Cost |
+|-------|----------------------|-------------|------------|-------------|
+| **100** | Very small (~500m) | Fastest (<10ms) | Deep (~15 levels) | High |
+| **500** | Small (~1-2km) | Fast (<50ms) | Medium (~10 levels) | Medium ✅ |
+| **2000** | Medium (~5km) | Slower (100ms+) | Shallow (~7 levels) | Low |
+| **5000** | Large (~10km+) | Slow (200ms+) | Very shallow (~5 levels) | Very low |
+
+**Yelp's choice (500)**:
+- ✅ Balances search speed (<100ms requirement)
+- ✅ Reasonable tree depth (~10 levels)
+- ✅ Manageable update cost when places added
+- ✅ Enough granularity for accurate distance filtering
+
+---
+
+## Implementation Details
+
+### Adding a New Place
+
+```python
+def add_place(place):
+    # 1. Find leaf segment containing place
+    leaf = quadtree.find_leaf(place.lat, place.lng)
+    
+    # 2. Add place to segment
+    leaf.places.append(place)
+    leaf.place_count += 1
+    
+    # 3. Check if split needed
+    if leaf.place_count > 500:
+        split_segment(leaf)
+        # Split into 4 children (NW, NE, SW, SE)
+        # Redistribute places among children
+        # Update neighbor pointers
+
+# Split operation (expensive but rare)
+def split_segment(leaf):
+    # Create 4 child nodes
+    nw = create_node(leaf.north, leaf.center_lat, leaf.west, leaf.center_lng)
+    ne = create_node(leaf.north, leaf.center_lat, leaf.center_lng, leaf.east)
+    sw = create_node(leaf.center_lat, leaf.south, leaf.west, leaf.center_lng)
+    se = create_node(leaf.center_lat, leaf.south, leaf.center_lng, leaf.east)
+    
+    # Redistribute places
+    for place in leaf.places:
+        if place.lat >= leaf.center_lat:
+            if place.lng >= leaf.center_lng:
+                ne.places.append(place)
+            else:
+                nw.places.append(place)
+        else:
+            if place.lng >= leaf.center_lng:
+                se.places.append(place)
+            else:
+                sw.places.append(place)
+    
+    # Link neighbors
+    link_siblings([nw, ne, sw, se])
+    update_parent_neighbors(leaf, [nw, ne, sw, se])
+    
+    # Mark leaf as internal node
+    leaf.children = [nw, ne, sw, se]
+    leaf.places = None  # No longer stores places
+```
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Fixed segment size**
+   - **Problem**: Urban overload, rural waste
+   - **Solution**: Dynamic QuadTree with place count threshold
+
+2. **Missing neighbor connections**
+   - **Problem**: Incomplete results near boundaries
+   - **Solution**: Doubly-linked list for O(1) neighbor access
+
+3. **Not caching segment tree**
+   - **Problem**: Tree traversal on every query
+   - **Solution**: Cache leaf nodes in Redis with geohash keys
+
+4. **Synchronous tree updates**
+   - **Problem**: Slow writes when splitting segments
+   - **Solution**: Async queue for splits, temporary over-limit tolerated
+
+5. **Ignoring user movement**
+   - **Problem**: Stale results as user travels
+   - **Solution**: Re-query every 500m or 30 seconds
+
+---
+
+## Real-World Optimizations
+
+### Yelp's Production Approach
+
+**Database sharding**:
+```
+- Shard by geohash prefix (first 4 characters)
+- Each shard: ~10M places, ~100GB
+- Hot shards (NYC, LA, SF) get more replicas
+```
+
+**Caching strategy**:
+```
+1. Redis cache: Leaf node data (TTL: 10 min)
+   Key: geohash:9q8yy → {places: [...], neighbors: [...]}
+
+2. CDN: Popular search results (TTL: 5 min)
+   Key: "restaurants near Union Square SF" → Top 20 results
+
+3. Client cache: Recently viewed places (TTL: 1 hour)
+```
+
+**Ranking factors**:
+```python
+score = (
+    0.4 * (1 / distance_km) +          # Closer is better
+    0.3 * rating / 5.0 +                # Higher rating better
+    0.2 * log(review_count) / 10 +     # More reviews = more credible
+    0.1 * is_open_now                   # Open businesses prioritized
+)
+```
+
+---
+
+## 📝 Quick Reference
+
+**Scale**: 200M reviews, 100M places, 35 countries  
+**Data structure**: QuadTree with 500 places/segment limit  
+**Segment size**: 500m-2km (urban), 10km-100km (rural)  
+**Search latency**: <100ms (tree traversal + distance calc + ranking)  
+**Neighbors**: Doubly-linked lists for O(1) expansion  
+**Update cost**: O(log N) for add, O(N log N) for split (rare)  
+**Key insight**: Dynamic segmentation adapts to place density, avoiding hot spots
+
+---
+
+<!-- TOC --><a name="11-uber"></a>
+# 11. Uber - Ride-Hailing Platform
+
+> **📌 Quick Summary**: Real-time driver-rider matching with optimized routing and payments  
+> **Scale**: 150M+ users, 7M+ drivers, 25M+ trips/day | **Complexity**: ⭐⭐⭐⭐⭐
+
+![image](https://github.com/user-attachments/assets/dd019f80-ee5f-4bf5-b3ce-f0a8dc9248a5)
+
+### System Requirements
+
+**Functional**:
+- ✅ Match riders with nearby available drivers
+- ✅ Calculate optimal route and ETA
+- ✅ Real-time location tracking during trip
+- ✅ Process payments securely
+- ✅ Ride history and receipts
+
+**Non-Functional**:
+- ⚡ **Matching latency**: <5s to find driver
+- 📍 **Location accuracy**: <10m GPS precision
+- 🔄 **Update frequency**: Driver location every 4s
+- 💳 **Payment reliability**: 99.99% success rate
+- 📈 **Scalability**: Handle 1M+ concurrent trips
+- 🔒 **Availability**: 99.95% uptime (rides must complete)
+
+---
+
+## 🎯 Driver Location Management
+
+### The Challenge: Real-Time Updates at Scale
+
+**Problem**: 7M drivers × location update every 4 seconds = 1.75M updates/sec
+
+**Naive approach issues**:
+- ❌ Update QuadTree every 4 seconds → too slow (repartitioning overhead)
+- ❌ Search entire driver database → too slow (billions of distance calculations)
+- ❌ Fixed grid → hot spots in city centers
+
+### Hybrid Solution: Hash Table + QuadTree
+
+**Two-tier architecture**:
+
+| Data Structure | Purpose | Update Frequency | Use Case |
+|----------------|---------|------------------|----------|
+| **Hash Table** | Latest driver positions | Every 4 seconds | Find nearby drivers NOW |
+| **QuadTree** | Segment-based organization | Every 15 seconds | Historical view, load balancing |
+
+**Why this works**:
+- ✅ Hash table: O(1) reads, fast writes, stores latest position
+- ✅ QuadTree: Batch updates reduce overhead, still provides spatial indexing
+- ✅ Decoupled: Riders use hash table (real-time), analytics use QuadTree (eventual consistency)
+
+---
+
+## Architecture Components
+
+### Data Flow
+
+```
+Driver App (GPS) 
+   ↓ Every 4 seconds
+WebSocket Server
+   ↓ Async write
+┌────────────────┬────────────────┐
+│  Hash Table    │   QuadTree     │
+│  (Instant)     │   (Batch 15s)  │
+├────────────────┼────────────────┤
+│ driver_id →    │ Segments with  │
+│ (lat, lng,     │ ≤500 drivers   │
+│  timestamp,    │ per leaf       │
+│  status)       │                │
+└────────────────┴────────────────┘
+         ↓                ↓
+    Rider Match     Analytics
+```
+
+### Hash Table Schema
+
+**Key-Value Structure** (Redis/Cassandra):
+```python
+# Key: driver_id
+# Value: JSON with latest state
+{
+  "driver_id": "d123",
+  "lat": 37.7749,
+  "lng": -122.4194,
+  "timestamp": 1699999999,
+  "status": "available",  # available, busy, offline
+  "car_type": "uberX",
+  "rating": 4.8
+}
+```
+
+**Update operation**:
+```python
+def update_driver_location(driver_id, lat, lng):
+    # O(1) hash table update
+    redis.hset(f"driver:{driver_id}", {
+        "lat": lat,
+        "lng": lng,
+        "timestamp": time.now(),
+        "status": "available"
+    })
+    
+    # Set expiry (cleanup stale drivers)
+    redis.expire(f"driver:{driver_id}", 60)  # Expire if no update in 1 min
+```
+
+### QuadTree for Segment Organization
+
+**Purpose**: Spatial indexing for analytics and load balancing
+
+**Structure**: Same as Yelp's approach
+- Split segment when >500 drivers
+- Leaf nodes contain driver lists
+- Updated every 15 seconds (batch)
+
+**Why 500 driver limit?**
+- Typical segment (2km × 2km in urban area)
+- 500 drivers = ~250 drivers per km²
+- Search among 500 is fast (<10ms)
+- Rare to exceed in most cities
+
+---
+
+## Rider-Driver Matching
+
+### Matching Algorithm
+
+```python
+def find_nearby_drivers(rider_lat, rider_lng, radius_km=5, car_type="uberX"):
+    # Step 1: Get all drivers from hash table (or sharded by geohash)
+    # This is the key optimization - use hash table for real-time data
+    
+    # Option A: Geohash-based sharding (production approach)
+    rider_geohash = geohash.encode(rider_lat, rider_lng, precision=5)
+    nearby_geohashes = geohash.neighbors(rider_geohash) + [rider_geohash]
+    
+    drivers = []
+    for gh in nearby_geohashes:
+        # Each geohash maps to a Redis shard
+        shard_drivers = redis.hgetall(f"drivers:geo:{gh}:*")
+        drivers.extend(shard_drivers)
+    
+    # Step 2: Filter by distance and availability
+    available_drivers = []
+    for driver in drivers:
+        if driver.status != "available":
+            continue
+        if driver.car_type != car_type:
+            continue
+        
+        distance = haversine(rider_lat, rider_lng, driver.lat, driver.lng)
+        if distance <= radius_km:
+            available_drivers.append({
+                "driver": driver,
+                "distance": distance,
+                "eta": distance / 30  # Assume 30 km/h average speed
+            })
+    
+    # Step 3: Rank drivers
+    # Priority: 1) Distance, 2) Rating, 3) Acceptance rate
+    available_drivers.sort(key=lambda d: (
+        d["distance"],
+        -d["driver"].rating,
+        -d["driver"].acceptance_rate
+    ))
+    
+    # Step 4: Send request to top 5 drivers
+    return available_drivers[:5]
+```
+
+### Matching Flow
+
+```
+1. Rider requests ride: (37.7749, -122.4194) → "Downtown SF"
+
+2. Find nearby drivers:
+   - Query hash table by geohash (37.774, -122.419)
+   - Get 50 drivers within 2km radius
+   - Filter: available=True, car_type=uberX
+   - Result: 15 available drivers
+
+3. Rank drivers:
+   - Driver A: 500m, rating 4.9, acceptance 95%  [Score: 1]
+   - Driver B: 800m, rating 4.7, acceptance 90%  [Score: 2]
+   - Driver C: 600m, rating 4.8, acceptance 92%  [Score: 3]
+   - ...
+
+4. Send ride request to top 5 drivers (parallel):
+   - Timeout: 15 seconds for acceptance
+   - First to accept gets the ride
+   - Others receive cancellation notification
+
+5. If no acceptance within 15s:
+   - Expand radius to 5km
+   - Retry with next 5 drivers
+```
+
+---
+
+## Routing: Shortest Path at Scale
+
+![image](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+
+### Why Not Dijkstra?
+
+**Problem**: Dijkstra too slow for production
+- NYC road network: 100K+ intersections
+- Dijkstra explores 50K+ nodes for 10km route
+- Time: 2-5 seconds per query
+- Can't scale to 1M+ concurrent rides
+
+### Solution: Contraction Hierarchies
+
+**Key idea**: Preprocess road network into hierarchical layers
+
+**Preprocessing** (done offline, once per day):
+```
+1. Identify road importance:
+   - Freeways: Highest (Level 5)
+   - Highways: High (Level 4)
+   - Arterial roads: Medium (Level 3)
+   - Residential: Low (Level 2)
+   - Alleys: Lowest (Level 1)
+
+2. Create shortcuts:
+   - Contract minor roads into shortcuts
+   - Example: A → B → C (residential) becomes A → C (shortcut)
+   - Reduces graph size by 80%+
+
+3. Build hierarchical index:
+   - Bottom layer: All roads
+   - Middle layers: Progressively major roads only
+   - Top layer: Freeways and highways only
+```
+
+**Query time** (online, <100ms):
+```
+1. Source → Nearest major road (Level 3+)
+   - Use precomputed paths (local roads only)
+   - Time: <10ms
+
+2. Major road routing:
+   - Run A* on contracted graph (80% smaller)
+   - Only explore highways and freeways
+   - Time: <50ms
+
+3. Nearest major road → Destination
+   - Use precomputed paths (local roads only)
+   - Time: <10ms
+
+Total: <100ms vs 2-5 seconds (Dijkstra)
+Speedup: 20-50x faster
+```
+
+### Partitioning for Parallel Processing
+
+**Geographic partitions**:
+```
+Divide city into grids (e.g., 100 partitions for NYC)
+- Each partition: 10km × 10km
+- Precompute paths within partition
+- Store border nodes (connections to other partitions)
+
+Query spanning partitions:
+- Partition A: Source → Border node A1 (10ms)
+- Partition B: Border node B1 → Border node B2 (10ms)
+- Partition C: Border node C1 → Destination (10ms)
+- Combine paths: Total 30ms (parallelized across 3 servers)
+```
+
+---
+
+## Payment Processing: Apache Kafka
+
+![image](https://github.com/user-attachments/assets/ef333239-b3a0-4777-9b4d-f934da8f6220)
+
+### Event-Driven Payment Flow
+
+```
+1. Trip ends → Driver marks "Complete"
+
+2. Order Creator:
+   - Calculate fare: distance × rate + surge + tolls
+   - Generate order: {trip_id, rider_id, driver_id, amount, timestamp}
+   - Publish to Kafka topic: "trip_completed"
+
+3. Kafka processes event:
+   - Persists event to disk (durability)
+   - Replicated across 3+ brokers (fault tolerance)
+
+4. Order Processor (Consumer):
+   - Reads from "trip_completed" topic
+   - Validates order (fraud detection, balance check)
+   - Creates payment intent
+   - Publishes to "payment_intent" topic
+
+5. Payment Service Provider (PSP) Integration:
+   - Reads from "payment_intent" topic
+   - Calls Stripe/Braintree API
+   - Processes card charge
+   - Returns result: success/failure
+
+6. Order Writer:
+   - Reads PSP result from "payment_result" topic
+   - Updates database: trip.status = "paid"
+   - Sends receipt to rider (email/SMS)
+   - Updates driver earnings
+
+7. Analytics:
+   - Kafka streams feed data warehouse
+   - Real-time dashboard: payments/sec, success rate
+```
+
+### Why Kafka for Payments?
+
+| Requirement | Kafka Benefit |
+|-------------|---------------|
+| **Durability** | Events persisted to disk, replicated |
+| **Retry logic** | Consumers can replay events on failure |
+| **Audit trail** | Complete payment history for compliance |
+| **Async processing** | Rider doesn't wait for payment (UX improvement) |
+| **Fault tolerance** | Multiple brokers, consumer groups |
+| **Scalability** | Horizontal scaling (add partitions/consumers) |
+| **Decoupling** | Services communicate via events, not direct calls |
+
+---
+
+## Non-Functional Requirements
+
+### Availability (99.95% uptime)
+
+**Strategies**:
+
+1. **WebSocket Redundancy**:
+   ```
+   - Multiple WebSocket servers per region (20+ per major city)
+   - Load balancer distributes connections
+   - If connection drops:
+     → Client reconnects via load balancer
+     → Session ID preserved (stored in Redis)
+     → Ride state restored from database
+   ```
+
+2. **Database Replication**:
+   ```
+   - Cassandra cluster (no single point of failure)
+   - Replication factor: 3 (each write to 3 nodes)
+   - Consistency level: QUORUM (2 of 3 nodes must ack)
+   - If node fails → automatic failover to replica
+   ```
+
+3. **Multi-Region Deployment**:
+   ```
+   - Primary region: Handles 90% of traffic
+   - Secondary region: Hot standby (replicates in real-time)
+   - If primary fails → DNS failover to secondary (RTO: 2 minutes)
+   ```
+
+### Scalability
+
+**Horizontal Scaling**:
+- Stateless services (matching, routing, payment) → add more instances
+- NoSQL (Cassandra) → add more nodes to cluster
+- Redis cache → cluster mode with sharding
+
+**Partitioning**:
+- Drivers sharded by geohash (spatial locality)
+- Trips sharded by `trip_id % 1000` (uniform distribution)
+- Payments sharded by `user_id % 100` (user affinity)
+
+---
+
+## ⚠️ Common Pitfalls
+
+1. **Updating QuadTree on every location change**
+   - **Problem**: 1.75M updates/sec, constant repartitioning
+   - **Solution**: Hash table for real-time, QuadTree batch update (15s)
+
+2. **Synchronous payment processing**
+   - **Problem**: Rider waits 5-10s for payment confirmation
+   - **Solution**: Kafka async processing, notify later
+
+3. **Single routing server**
+   - **Problem**: Bottleneck, can't handle 1M concurrent routes
+   - **Solution**: Geographic partitioning + contraction hierarchies
+
+4. **No driver location expiry**
+   - **Problem**: Stale drivers shown as available
+   - **Solution**: Redis TTL 60s, auto-cleanup inactive drivers
+
+5. **Not handling network partitions**
+   - **Problem**: Rider and driver see different ride states
+   - **Solution**: Eventual consistency + idempotency keys
+
+---
+
+## 📝 Quick Reference
+
+**Scale**: 150M users, 7M drivers, 25M trips/day  
+**Location updates**: 1.75M/sec (drivers every 4s)  
+**Data structure**: Hash table (4s) + QuadTree (15s) hybrid  
+**Routing**: Contraction Hierarchies (20-50x faster than Dijkstra)  
+**Payments**: Kafka event-driven pipeline (async)  
+**Database**: Cassandra (no SPOF), Redis (real-time cache)  
+**Availability**: 99.95% via WebSocket redundancy + multi-region  
+**Key insight**: Dual storage (hash table + QuadTree) balances real-time accuracy with spatial indexing efficiency
+
+---

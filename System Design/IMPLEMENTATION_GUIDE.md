@@ -34,14 +34,19 @@
 - [x] Task Scheduler - Failure scenarios
 - [x] Sharded Counters - Scalability analysis
 
-### Phase 4: Real-World Systems (Sections 7-17)
+### Phase 4: Real-World Systems (Sections 7-17) 🔄 IN PROGRESS
 For each system (YouTube, Twitter, etc.):
-- [ ] Add scale metrics (users, requests/sec, data volume)
-- [ ] Create component responsibility tables
-- [ ] Add data flow diagrams with latency annotations
-- [ ] Include failure scenarios & mitigation
-- [ ] Add "Why This Architecture" sections
-- [ ] Document evolution over time
+- [x] YouTube - Video upload/streaming with CDN
+- [x] Quora - Dual cache strategy + ML recommendations
+- [x] Google Maps - Segment-based routing + traffic prediction
+- [x] Yelp - Dynamic QuadTree for proximity search
+- [x] Uber - Hybrid location tracking + Kafka payments
+- [ ] Twitter - Manhattan store + distributed search
+- [ ] Instagram - Push/pull feed strategies
+- [ ] WhatsApp - Group messaging + WebSocket
+- [ ] Newsfeed System - Ranking algorithms
+- [ ] Typeahead - Trie + caching strategies
+- [ ] Google Docs - Operational transformation
 
 ### Phase 5: Final Enhancements
 - [ ] Create Pattern Index appendix
