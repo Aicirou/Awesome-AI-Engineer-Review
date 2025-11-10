@@ -1874,6 +1874,30 @@ Doc3: "Quick brown dogs"
 
 ![image](https://github.com/user-attachments/assets/f637f109-db53-442e-ab43-b30386246e5f)
 
+**🔍 Image Description - Inverted Index Structure & Query Flow**: This diagram illustrates how inverted indexes enable fast full-text search:
+- **Forward index (top)**: Traditional document-to-terms mapping showing Document 1 → ["the", "quick", "brown", "fox"], Document 2 → ["the", "lazy", "dog"], Document 3 → ["dogs", "are", "loyal"]. Arrow indicating this approach requires scanning all documents for each query.
+- **Inverted index (bottom)**: Flipped term-to-documents mapping showing efficient lookup structure:
+  - Term "quick" → [Doc1] with metadata (position: 1, frequency: 1)
+  - Term "brown" → [Doc1] with position: 2
+  - Term "dog" → [Doc2, Doc3] with positions (after stemming "dogs" → "dog")
+  - HashMap visualization with O(1) term lookup time
+- **Query execution flow**: Arrows showing how a search query "brown dog" is processed:
+  1. **Tokenization**: "brown dog" → ["brown", "dog"] tokens
+  2. **Index lookup**: Fetch posting lists for each term in parallel
+  3. **Boolean operations**: Merge posting lists (AND/OR/NOT operations)
+  4. **Ranking**: Apply TF-IDF or BM25 scoring to sort results by relevance
+  5. **Result set**: Return sorted list [Doc1, Doc2] with relevance scores
+- **Posting list details**: Each entry shows document ID, term frequency (TF), term positions (for phrase queries), and document length normalization factor.
+- **Optimization annotations**:
+  - **Skip pointers**: Arrows showing jump optimization in long posting lists (skip over irrelevant sections)
+  - **Compression**: Delta encoding for document IDs (store differences: 1, 5, 3 instead of 1, 6, 9)
+  - **Bloom filters**: Quick negative lookup before accessing posting lists
+- **Distributed architecture**: Shows how index is sharded across multiple nodes:
+  - **Document partitioning**: Each shard contains full index for subset of documents
+  - **Term partitioning**: Alternative approach with each shard handling subset of terms
+  - Comparison table showing trade-offs (document partitioning: balanced load vs term partitioning: fewer shards per query)
+- **Modern implementations (2024-2025)**: Elasticsearch/OpenSearch using Lucene inverted indexes with vector embeddings for semantic search (hybrid keyword + neural retrieval), Algolia with typo-tolerance (edit distance), and real-time indexing (<1s latency from write to searchable). Also shows integration with transformer-based reranking models (BERT, T5) for relevance improvements.
+
 ### Building Inverted Index: Step-by-Step
 
 #### Phase 1: Tokenization
@@ -1921,6 +1945,34 @@ For each token:
 > **📌 Distributed index building across cluster**
 
 ![image](https://github.com/user-attachments/assets/aec48b4a-8451-4b04-8d9a-3077a272e051)
+
+**🔍 Image Description - MapReduce Inverted Index Building Process**: This diagram shows the distributed indexing workflow using MapReduce paradigm:
+- **Input layer (top)**: Large document corpus split across multiple nodes (Doc1, Doc2, Doc3...DocN) stored in distributed file system (HDFS/S3), each document ~1MB-10GB size.
+- **Map phase (parallel processing)**:
+  - Each mapper processes a subset of documents independently
+  - Tokenization: "The quick brown fox" → ["quick", "brown", "fox"]
+  - Emit intermediate key-value pairs: (term, doc_id) tuples
+  - Example mapper output: ("quick", Doc1), ("brown", Doc1), ("fox", Doc1), ("lazy", Doc2), ("dog", Doc2)
+  - Shows N mapper nodes processing in parallel, each handling 1000-10000 documents
+- **Shuffle/Sort phase (middle layer)**:
+  - Group all values by key (term) across all mappers
+  - Arrows showing data redistribution/partitioning by term hash
+  - Network shuffle illustrated with colored data streams converging
+  - Sorting within each group to prepare for reduce phase
+  - Example grouped data: "brown" → [Doc1, Doc5, Doc12], "dog" → [Doc2, Doc8, Doc15]
+- **Reduce phase (aggregation)**:
+  - Each reducer processes one term across all documents
+  - Build posting list for each term with document IDs and metadata
+  - Calculate term frequency (TF), document frequency (DF), and TF-IDF scores
+  - Output: Final inverted index entry: "brown" → [(Doc1, TF:1, pos:2), (Doc5, TF:2, pos:0,7), (Doc12, TF:1, pos:5)]
+  - M reducer nodes, each handling subset of terms
+- **Output layer (bottom)**: Final inverted index stored in distributed storage, sharded by term or document. Shows index segments ready for search queries.
+- **Performance metrics**: Annotations showing typical throughput: 1TB corpus indexed in 1-2 hours using 100-node cluster, with 500GB/hour processing rate.
+- **Optimization highlights**:
+  - **Combiner optimization**: Local aggregation at mapper to reduce shuffle data (50-70% reduction)
+  - **Partitioning strategy**: Hash-based term partitioning ensures even distribution across reducers
+  - **Compression**: Gzip intermediate data during shuffle saves network bandwidth
+- **Modern alternatives (2024-2025)**: Apache Spark RDD operations replacing MapReduce (10x faster with in-memory processing), Apache Flink for real-time stream indexing, and cloud-native solutions like AWS Glue/EMR with serverless auto-scaling.
 
 **Map Phase**:
 ```python
