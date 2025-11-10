@@ -1002,3 +1002,431 @@ Cassandra uses Merkle trees for **nodetool repair**:
 **Recalculation cost**: Schedule during off-peak hours
 
 ---
+
+<!-- TOC --><a name="2-content-delivery-network-cdn"></a>
+# 2. Content Delivery Network (CDN)
+
+> **📌 Quick Summary**: Globally distributed network of proxy servers that cache and deliver content closer to end users  
+> **Use Cases**: Video streaming, static assets, software downloads | **Complexity**: ⭐⭐⭐⭐⭐
+
+![image](https://github.com/user-attachments/assets/a258e1d0-0278-4c5c-8276-dd416f6e4fa4)
+
+### Why CDN?
+
+**The Problem**: Data-intensive applications face challenges over long distances:
+- 🌐 **Network path complexity**: Traffic traverses multiple ISPs with varying characteristics
+- 📉 **Reduced throughput**: Smaller MTU (Message Transmission Unit) links limit bandwidth
+- 🔄 **Redundant transfers**: Origin server sends same content to millions of users individually
+- ⏱️ **High latency**: Geographical distance increases round-trip time
+- 🔥 **Origin server bottleneck**: Single point becomes overwhelmed at scale
+
+**The Solution**: Distribute content to edge locations near users, reducing latency and origin load.
+
+### 🎯 Key Concepts
+
+- **Edge server**: Proxy server at the CDN edge, closest to users
+- **Origin server**: Source of truth for content, updated by content providers
+- **Cache hit ratio**: Percentage of requests served from cache vs origin
+- **TTL (Time To Live)**: How long content stays cached before refresh
+- **Purge/Invalidation**: Manually removing stale content from cache
+
+---
+
+## CDN Architecture Components
+
+![image](https://github.com/user-attachments/assets/33b90165-2d44-44e1-8d0a-72e684fe5168)
+
+### Component Responsibility Table
+
+| Component | Responsibility | Technology Examples | Scale |
+|-----------|----------------|---------------------|-------|
+| **Clients** | Request content from CDN | Browsers, mobile apps, IoT devices | Billions |
+| **Routing System** | Direct clients to nearest edge | DNS, Anycast, GeoDNS | Global |
+| **Scrubber Servers** | Filter malicious traffic | DDoS protection, WAF | As needed |
+| **Proxy/Edge Servers** | Serve cached content from RAM | NGINX, Varnish | Thousands |
+| **Distribution System** | Push content to edge servers | Multicast, P2P protocols | Regional |
+| **Origin Servers** | Source of truth for content | Web servers, object storage | Hundreds |
+| **Management System** | Monitor metrics & billing | Prometheus, custom analytics | Centralized |
+
+### Component Details
+
+#### 1. Clients
+End users accessing content through various devices: browsers, smartphones, smart TVs, gaming consoles.
+
+#### 2. Routing System
+**Purpose**: Direct each user to the optimal edge server based on:
+- 📍 Geographic proximity (lowest latency)
+- 📊 Server load (avoid overloaded nodes)
+- 🌐 Network conditions (congestion, available bandwidth)
+- 📦 Content availability (which edge has the requested content)
+
+**Implementation**: See section 2.2 DNS Redirection for details.
+
+#### 3. Scrubber Servers
+**Purpose**: Security layer that filters traffic during attacks
+- **When active**: Triggered upon attack detection
+- **Function**: Separate legitimate traffic from malicious requests
+- **Protection**: DDoS mitigation, bot filtering, rate limiting
+- **Routing**: Clean traffic forwarded to edge servers
+
+#### 4. Proxy/Edge Servers
+**Core function**: Serve content directly to users
+- ⚡ **Hot data**: Stored in RAM for <5ms access time
+- 💾 **Cold data**: Less popular content on SSD/HDD
+- 📊 **Accounting**: Track requests, bandwidth, cache hits
+- 🔄 **Content updates**: Receive from distribution system
+
+**Performance characteristics**:
+- RAM cache: 1-5ms latency
+- SSD cache: 10-20ms latency
+- Origin fallback: 100-500ms latency
+
+#### 5. Distribution System
+**Purpose**: Efficiently propagate content to all edge servers
+- 🌳 **Tree structure**: Hierarchical distribution to reduce origin load
+- 📡 **Broadcast-like**: Push updates to multiple edges simultaneously
+- 🔄 **Pull on demand**: Edge fetches content when first requested
+- 📦 **Chunked transfer**: Large files distributed in pieces
+
+#### 6. Origin Servers
+**Purpose**: Authoritative source for content
+- 📤 **Content upload**: Receive new/updated content from providers
+- 🔍 **Metadata storage**: File info, versions, access controls
+- 🆘 **Cache miss fallback**: Serve content when not in CDN cache
+- 🔧 **Dynamic content**: Generate personalized responses
+
+#### 7. Management System
+**Purpose**: Operations, monitoring, and business analytics
+- 📈 **Metrics**: Latency, cache hit ratio, bandwidth, error rates
+- 💰 **Billing**: Track usage for third-party CDN customers
+- 🚨 **Alerts**: Notify on performance degradation or outages
+- 📊 **Analytics**: Geographic distribution, popular content
+
+---
+
+<!-- TOC --><a name="21-multi-tier-cdn-architecture"></a>
+## 2.1 Multi-tier CDN Architecture
+
+> **📌 Quick Summary**: Hierarchical tree structure for efficient content distribution from origin to edge servers
+
+### The Challenge
+
+Distributing content from origin to **thousands of edge servers simultaneously** creates massive load. If origin server directly updates all edges, it becomes a bottleneck.
+
+### The Solution: Tree Hierarchy
+
+```
+                        Origin Server (Root)
+                              |
+            +-----------------+-----------------+
+            |                 |                 |
+     Regional Hub 1    Regional Hub 2    Regional Hub 3
+        (Parent)          (Parent)          (Parent)
+            |                 |                 |
+    +-------+-------+   +-----+-----+     +-----+-----+
+    |       |       |   |     |     |     |     |     |
+  Edge1  Edge2  Edge3 Edge4 Edge5 Edge6 Edge7 Edge8 Edge9
+```
+
+### How It Works
+
+1. **Origin → Regional Hubs**: Content pushed to handful of regional parent nodes
+2. **Hubs → Edge Servers**: Regional hubs distribute to their child edges
+3. **Parallel distribution**: Multiple paths reduce single-point bottleneck
+4. **Load spreading**: Each node only manages its direct children
+
+### 💡 Benefits
+
+- ✅ **Reduced origin load**: Origin serves 10s of hubs, not 1000s of edges
+- ✅ **Faster propagation**: Parallel distribution paths
+- ✅ **Scalability**: Add more edges without increasing origin burden
+- ✅ **Resilience**: Tree redundancy handles node failures
+
+### Long-Tail Content Handling
+
+**Research insight**: Content popularity follows **long-tail distribution**
+- 📊 **Head**: Small number of very popular items (viral videos, trending news)
+- 📉 **Tail**: Large number of less popular items (niche content)
+
+**Multi-layer cache strategy**:
+- **Layer 1 (Edge)**: Cache only hot content (top 10-20%)
+- **Layer 2 (Regional)**: Cache moderately popular content (next 30%)
+- **Layer 3 (Origin)**: Store everything, serve rarely-accessed tail
+
+**Trade-off**: 
+- Edge storage cost vs cache hit ratio
+- Optimal: 80%+ requests served from edge, 15% from regional, 5% from origin
+
+---
+
+<!-- TOC --><a name="22-dns-redirection"></a>
+## 2.2 DNS Redirection
+
+> **📌 Quick Summary**: Two-step process to route clients to optimal edge server using DNS
+
+### How DNS Redirection Works
+
+#### Step 1: Geographic Mapping
+Map client to appropriate network location (nearest CDN data center)
+- Uses client's IP address geolocation
+- Considers network topology and latency
+- Returns IP of nearby CDN facility
+
+#### Step 2: Load Distribution
+Within selected facility, distribute load across proxy servers
+- Round-robin or least-connections algorithm
+- Health checks ensure only healthy servers receive traffic
+- Session affinity if needed (sticky sessions)
+
+### 🎯 Factors Considered
+
+1. **Network distance**: Geographic proximity, round-trip time
+2. **Server load**: Current requests per server, CPU usage
+3. **Content availability**: Which edges have cached the content
+4. **Network conditions**: Congestion, packet loss, bandwidth
+
+### DNS Redirection Flow
+
+```
+1. User requests: video.example.com
+2. DNS resolver queries CDN nameserver
+3. CDN evaluates:
+   - User location (IP geolocation)
+   - Edge server loads
+   - Content availability
+4. CDN returns IP: edge-seattle.cdn.example.com (closest, least loaded)
+5. User connects directly to Seattle edge server
+6. Edge serves content from cache (or fetches from origin)
+```
+
+### Benefits
+
+- ✅ **Reduced latency**: Users connect to nearby edge
+- ✅ **Load balancing**: Distribute across multiple servers
+- ✅ **Automatic failover**: DNS returns healthy servers only
+- ✅ **Global reach**: Works across continents
+
+### 📝 Quick Reference
+
+**Typical latency reduction**: 200-500ms (origin) → 20-50ms (edge)  
+**DNS TTL**: 60-300 seconds (balance between flexibility and DNS load)  
+**Fallback**: Origin server serves if all edges unavailable
+
+---
+
+<!-- TOC --><a name="24-distributed-cache"></a>
+## 2.4 Distributed Cache
+
+> **📌 Quick Summary**: Horizontally scaled caching system to handle massive data volumes with low latency  
+> **Use Cases**: Session storage, API responses, database query results | **Complexity**: ⭐⭐⭐⭐☆
+
+### Why Distributed Cache?
+
+**Problem**: Single-server cache limitations at scale
+- ❌ **Single Point of Failure (SPOF)**: One server down = entire cache lost
+- ❌ **Capacity limits**: RAM constraints limit cacheable data size
+- ❌ **Performance bottleneck**: One server can't handle millions of QPS
+- ❌ **Data coupling**: Sensitive data from different layers mixed together
+
+**Solution**: Distribute cache across multiple servers (shards)
+
+### 🎯 Distribution Benefits
+
+1. **Layer-specific caching**: Each system layer has its own cache
+   - Web tier: Session data, user preferences
+   - Application tier: Business logic results, computed values
+   - Database tier: Query results, row-level data
+
+2. **Reduced latency**: Cache closer to where data is needed
+3. **Fault tolerance**: Multiple servers provide redundancy
+4. **Horizontal scalability**: Add more cache servers as needed
+
+---
+
+<!-- TOC --><a name="241-internals-of-cache-server"></a>
+### 2.4.1 Internals of Cache Server
+
+> **📌 Quick Summary**: Three core mechanisms for efficient caching: hash map, doubly linked list, eviction policy
+
+### Architecture Components
+
+#### 1. Hash Map (O(1) lookup)
+**Purpose**: Fast key-value lookups
+- Stores pointers to cached values
+- Constant-time access on average
+- Handles collision with chaining or open addressing
+
+**Example**:
+```
+HashMap<String, Pointer>
+"user:12345" → Pointer to value in RAM
+"product:789" → Pointer to value in RAM
+```
+
+#### 2. Doubly Linked List (O(1) updates)
+**Purpose**: Maintain access order for eviction
+- Most recently used (MRU) at head
+- Least recently used (LRU) at tail
+- Constant-time insert/delete operations
+
+**Structure**:
+```
+HEAD <-> [Node: user:999] <-> [Node: product:123] <-> [Node: user:456] <-> TAIL
+         (Most recent)                                      (Least recent)
+```
+
+#### 3. Eviction Policy
+**Purpose**: Remove entries when cache is full
+
+**LRU (Least Recently Used)** - Most common:
+- Evict items not accessed for longest time
+- Assumption: Recently used data likely to be used again
+- Implementation: Move accessed items to list head
+
+**Alternative policies**:
+- **LFU** (Least Frequently Used): Evict items accessed fewest times
+- **FIFO** (First In First Out): Evict oldest items regardless of access
+- **TTL** (Time To Live): Evict after fixed duration
+- **Random**: Evict random item (simple, surprisingly effective)
+
+### Cache Operation Flow
+
+**GET operation**:
+```
+1. Hash key to find bucket in HashMap
+2. Retrieve value pointer (O(1))
+3. Move node to head of linked list (mark as recently used)
+4. Return value to client
+```
+
+**PUT operation**:
+```
+1. Check if key exists in HashMap
+2. If exists: Update value, move to list head
+3. If not exists:
+   - Check capacity
+   - If full: Evict LRU item (remove tail node)
+   - Add new entry to HashMap
+   - Insert new node at list head
+```
+
+---
+
+<!-- TOC --><a name="242-high-performance"></a>
+### 2.4.2 High Performance Characteristics
+
+> **�� Quick Summary**: Multiple optimizations combine for sub-millisecond cache performance
+
+### Performance Optimizations
+
+| Optimization | Time Complexity | Impact |
+|--------------|-----------------|--------|
+| **Consistent hashing** | O(log N) | Find cache shard efficiently |
+| **Hash table lookup** | O(1) average | Locate key within shard |
+| **LRU updates** | O(1) | Access/update cache entries |
+| **TCP/UDP protocols** | <1ms local | Fast client-server communication |
+| **Replication** | N/A | Distribute load, handle failures |
+| **RAM storage** | <1µs | Ultra-low latency access |
+
+### Performance Metrics
+
+- **Latency**: 0.5-5ms typical (vs 50-100ms database)
+- **Throughput**: 100K+ QPS per server
+- **Cache hit ratio**: 80-95% typical
+- **Memory efficiency**: ~100 bytes overhead per entry
+
+### 🎯 Key Design Decisions
+
+1. **Consistent hashing for sharding**
+   - Minimal key redistribution when adding/removing servers
+   - Virtual nodes for even load distribution
+   - O(log N) lookup time acceptable for cache use case
+
+2. **RAM-only storage**
+   - 1000x faster than SSD
+   - Volatile but acceptable for cache (not source of truth)
+   - Cost-effective for hot data
+
+3. **Replication for reliability**
+   - Typically 2-3 replicas per shard
+   - Read operations distributed across replicas
+   - Reduces single-server overload
+   - Provides fault tolerance
+
+4. **Asynchronous replication**
+   - Primary responds immediately
+   - Replicas updated in background
+   - Trade-off: Eventual consistency for lower latency
+
+---
+
+<!-- TOC --><a name="243-memcached-vs-redis-feature-comparison"></a>
+### 2.4.3 Memcached vs. Redis: Feature Comparison
+
+> **📌 Quick Summary**: Two popular distributed cache solutions with different trade-offs
+
+### Feature Comparison Matrix
+
+| Feature | Memcached | Redis | Winner |
+|---------|-----------|-------|--------|
+| **Low latency** | ✅ Yes | ✅ Yes | Tie |
+| **Persistence** | ⚠️ 3rd-party tools | ✅ Built-in (RDB, AOF) | **Redis** |
+| **Multilanguage support** | ✅ Yes | ✅ Yes | Tie |
+| **Data sharding** | ⚠️ 3rd-party | ✅ Built-in (Cluster mode) | **Redis** |
+| **Ease of use** | ✅ Simple | ✅ Simple | Tie |
+| **Multithreading** | ✅ Yes | ❌ No (single-threaded) | **Memcached** |
+| **Data structures** | Objects only | Lists, Sets, Sorted Sets, Hashes, Streams | **Redis** |
+| **Transactions** | ❌ No | ✅ Yes (MULTI/EXEC) | **Redis** |
+| **Eviction policies** | LRU only | LRU, LFU, Random, TTL, volatile-* | **Redis** |
+| **Lua scripting** | ❌ No | ✅ Yes | **Redis** |
+| **Geospatial support** | ❌ No | ✅ Yes (GEOADD, GEORADIUS) | **Redis** |
+| **Pub/Sub messaging** | ❌ No | ✅ Yes | **Redis** |
+| **Memory efficiency** | High | Moderate | **Memcached** |
+| **Performance (reads)** | ~1M ops/sec | ~100K ops/sec | **Memcached** |
+
+### 💡 When to Choose
+
+#### Choose Memcached when:
+- ✅ **Pure caching**: Simple key-value storage, no complex data structures
+- ✅ **Maximum throughput**: Need highest possible ops/sec
+- ✅ **Multithreading**: Want to utilize all CPU cores
+- ✅ **Memory efficiency**: Limited RAM, need maximum cache entries
+- ✅ **Simple use case**: No need for persistence or advanced features
+
+#### Choose Redis when:
+- ✅ **Rich data structures**: Need lists, sets, sorted sets, hashes
+- ✅ **Persistence required**: Cache should survive restarts
+- ✅ **Pub/Sub messaging**: Real-time event distribution
+- ✅ **Transactions**: Need atomic multi-key operations
+- ✅ **Lua scripting**: Complex server-side logic
+- ✅ **Geospatial queries**: Location-based features
+- ✅ **Flexible eviction**: Need LFU or custom policies
+
+### ⚖️ Trade-offs
+
+**Memcached**:
+- ✅ **Pros**: Higher throughput, multi-threaded, memory efficient
+- ❌ **Cons**: Limited features, no persistence, objects only
+
+**Redis**:
+- ✅ **Pros**: Feature-rich, persistence, data structures, scripting
+- ❌ **Cons**: Single-threaded, higher memory overhead, lower peak throughput
+
+### Real-World Usage
+
+| Company | Choice | Reasoning |
+|---------|--------|-----------|
+| **Facebook** | Memcached | Pure caching, maximum throughput (billions of requests) |
+| **Twitter** | Redis | Timelines (sorted sets), pub/sub for real-time updates |
+| **GitHub** | Redis | Job queues (lists), background processing |
+| **Pinterest** | Redis | Feed storage (sorted sets), geospatial queries |
+| **Stack Overflow** | Redis | Leaderboards (sorted sets), session storage |
+
+### 📝 Quick Reference
+
+**Default choice**: Redis for most use cases (richer features, minimal performance difference)  
+**Memcached niche**: Pure caching at extreme scale (>1M QPS per server)  
+**Hybrid approach**: Use both—Memcached for hot paths, Redis for complex operations  
+**Migration path**: Start with Redis, move hot data to Memcached if needed
+
+---
